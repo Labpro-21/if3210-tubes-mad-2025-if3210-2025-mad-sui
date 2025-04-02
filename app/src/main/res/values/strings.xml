@@ -5,6 +5,11 @@
     <string name="login_button">Log In</string>
     <string name="login_headline">Millions of Songs.\nOnly on Bronify.</string>
 
+    <string name="nav_home">Home</string>
+    <string name="nav_library">Library</string>
+    <string name="nav_profile">Profile</string>
+
+
     <string name="password_placeholder">Enter your password</string>
     <string name="password_label">Password</string>
 

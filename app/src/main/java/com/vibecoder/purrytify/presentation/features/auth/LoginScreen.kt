@@ -48,8 +48,7 @@ fun LoginScreen(
 
     LaunchedEffect(key1 = state.isSuccess) {
         if (state.isSuccess) {
-            onLoginSuccess()
-
+            onLoginSuccess() 
         }
     }
 

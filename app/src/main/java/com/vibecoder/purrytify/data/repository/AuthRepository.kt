@@ -19,7 +19,7 @@ class AuthRepository @Inject constructor(
     suspend fun login(email: String, password: String): Resource<Unit> {
         return try {
             val response = api.login(LoginRequest(email, password))
-            tokenManager.saveToken(response.token)
+            tokenManager.saveToken(response.accessToken)
             tokenManager.saveRefreshToken(response.refreshToken)
             Resource.Success(Unit)
         } catch (e: HttpException) {
@@ -39,7 +39,7 @@ class AuthRepository @Inject constructor(
             val refreshToken = tokenManager.refreshToken.first()
             if (refreshToken != null) {
                 val response = api.refreshToken(RefreshTokenRequest(refreshToken))
-                tokenManager.saveToken(response.token)
+                tokenManager.saveToken(response.accessToken)
                 tokenManager.saveRefreshToken(response.refreshToken)
                 Resource.Success(Unit)
             } else {
