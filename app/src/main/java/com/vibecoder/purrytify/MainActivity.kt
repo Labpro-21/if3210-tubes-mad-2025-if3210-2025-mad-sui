@@ -51,7 +51,6 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-
 fun AppNavigation(isAuthenticatedFlow: kotlinx.coroutines.flow.StateFlow<Boolean?>) {
     val navController = rememberNavController()
     val isAuthenticated by isAuthenticatedFlow.collectAsState()
@@ -65,7 +64,6 @@ fun AppNavigation(isAuthenticatedFlow: kotlinx.coroutines.flow.StateFlow<Boolean
         navController = navController,
         startDestination = startDestination,
     ) {
-
         composable(AppDestinations.LOGIN_ROUTE) {
             LoginScreen(
                 onLoginSuccess = {
@@ -78,9 +76,8 @@ fun AppNavigation(isAuthenticatedFlow: kotlinx.coroutines.flow.StateFlow<Boolean
 
         composable(AppDestinations.HOME_ROUTE) {
             HomeScreen(
-                navigateToSearch = { /* Implement navigation */ },
-                navigateToPlaylist = { /* Implement navigation */ },
-                navigateToArtist = { /* Implement navigation */ }
+                navController = navController,
+                currentRoute = AppDestinations.HOME_ROUTE,
             )
         }
     }

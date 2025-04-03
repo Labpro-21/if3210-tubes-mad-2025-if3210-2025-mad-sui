@@ -19,6 +19,7 @@ activityCompose = "1.8.0"
 composeBom = "2024.04.01"
 loggingInterceptor = "4.12.0"
 materialIconsExtended = "1.7.8"
+paletteKtx = "1.0.0"
 roomCompiler = "2.6.1"
 roomRuntime = "2.6.1"
 lifecycleViewmodelAndroid = "2.8.7"
@@ -30,6 +31,7 @@ androidx-datastore-preferences = { module = "androidx.datastore:datastore-prefer
 androidx-hilt-navigation-compose = { module = "androidx.hilt:hilt-navigation-compose", version.ref = "hiltNavigationCompose" }
 androidx-material-icons-core = { module = "androidx.compose.material:material-icons-core", version.ref = "materialIconsExtended" }
 androidx-material-icons-extended = { module = "androidx.compose.material:material-icons-extended", version.ref = "materialIconsExtended" }
+androidx-palette-ktx = { module = "androidx.palette:palette-ktx", version.ref = "paletteKtx" }
 androidx-room-compiler = { module = "androidx.room:room-compiler", version.ref = "roomCompiler" }
 androidx-room-runtime = { module = "androidx.room:room-runtime", version.ref = "roomRuntime" }
 coil-compose = { module = "io.coil-kt:coil-compose", version.ref = "coilCompose" }
