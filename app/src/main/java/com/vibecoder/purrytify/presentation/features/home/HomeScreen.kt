@@ -4,42 +4,37 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.vibecoder.purrytify.presentation.components.MusicCard
 
 import com.vibecoder.purrytify.presentation.components.BottomNavigationBar
 import com.vibecoder.purrytify.presentation.components.SmallMusicCard
-import com.vibecoder.purrytify.presentation.theme.OffWhite
 import com.vibecoder.purrytify.presentation.components.MinimizedMusicPlayer
-import androidx.lifecycle.viewmodel.compose.viewModel
+import com.vibecoder.purrytify.domain.model.Song
+import com.vibecoder.purrytify.presentation.features.auth.LoginViewModel
 
 @Composable
 fun HomeScreen(
     navController: NavController,
-    currentRoute: String,
-    viewModel: HomeScreenViewModel = viewModel()
+    viewModel: HomeViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsState()
 
     Scaffold(
         bottomBar = {
             Column {
-                state.currentTrack?.let { track ->
+                state.currentSong?.let { song ->
                     MinimizedMusicPlayer(
-                        title = track.title,
-                        artist = track.artist,
-//                        coverUrl = track.coverUrl,
-                        coverUrl = "https://upload.wikimedia.org/wikipedia/en/3/39/The_Weeknd_-_Starboy.png",
+                        title = song.title,
+                        artist = song.artist,
+                        coverUrl = song.coverUrl,
                         isPlaying = state.isPlaying,
                         isFavorite = state.isFavorite,
                         onPlayPauseClick = { viewModel.togglePlayPause() },
@@ -70,7 +65,7 @@ fun HomeScreen(
                             title = track.title,
                             artist = track.artist,
                             coverUrl = track.coverUrl,
-                            onClick = { viewModel.selectTrack(track) }
+                            onClick = { viewModel.selectSong(track) }
                         )
                     }
                 }
@@ -87,7 +82,7 @@ fun HomeScreen(
                             title = track.title,
                             artist = track.artist,
                             coverUrl = track.coverUrl,
-                            onClick = { viewModel.selectTrack(track) }
+                            onClick = { viewModel.selectSong(track) }
                         )
                     }
                 }
@@ -113,18 +108,13 @@ fun SectionHeader(title: String) {
     }
 }
 
-
-
-
-data class Track(val id: String, val title: String, val artist: String, val coverUrl: String)
-
-fun getDummyRecentlyPlayed(): List<Track> {
+fun getDummyRecentlyPlayed(): List<Song> {
     return listOf(
-        Track("1", "Bohemian Rhapsody", "Queen", "https://example.com/image1.jpg"),
-        Track("2", "Blinding Lights", "The Weeknd", "https://example.com/image2.jpg"),
-        Track("3", "Levitating", "Dua Lipa", "https://example.com/image3.jpg"),
-        Track("4", "As It Was", "Harry Styles", "https://example.com/image4.jpg"),
-        Track("5", "Bad Habit", "Steve Lacy", "https://example.com/image5.jpg")
+        Song("1", "Bohemian Rhapsody", "Queen", "https://example.com/image1.jpg"),
+        Song("2", "Blinding Lights", "The Weeknd", "https://example.com/image2.jpg"),
+        Song("3", "Levitating", "Dua Lipa", "https://example.com/image3.jpg"),
+        Song("4", "As It Was", "Harry Styles", "https://example.com/image4.jpg"),
+        Song("5", "Bad Habit", "Steve Lacy", "https://example.com/image5.jpg")
     )
 }
 

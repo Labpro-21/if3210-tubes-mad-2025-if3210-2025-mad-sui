@@ -23,8 +23,8 @@ sealed class NavigationItem(val route: String, val labelResId: Int, val iconResI
         R.drawable.ic_home
     )
     object Library : NavigationItem(
-        "library",
-//        AppDestinations.LIBRARY_ROUTE,
+        // "library",
+       AppDestinations.LIBRARY_ROUTE,
         R.string.nav_library,
         R.drawable.ic_library
     )

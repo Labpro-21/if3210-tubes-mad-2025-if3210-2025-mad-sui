@@ -1,28 +1,30 @@
 package com.vibecoder.purrytify.presentation.features.home
 
 import androidx.lifecycle.ViewModel
+import com.vibecoder.purrytify.domain.model.Song
+import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 data class HomeScreenState(
-    val currentTrack: Track? = null,
+    val currentSong: Song? = null,
     val isPlaying: Boolean = false,
     val isFavorite: Boolean = false,
-    val recentlyPlayed: List<Track> = emptyList(),
-    val newSongs: List<Track> = emptyList()
+    val recentlyPlayed: List<Song> = emptyList(),
+    val newSongs: List<Song> = emptyList()
 )
 
-class HomeScreenViewModel : ViewModel() {
+//@HiltViewModel
+class HomeViewModel : ViewModel() {
     private val _state = MutableStateFlow(HomeScreenState())
     val state: StateFlow<HomeScreenState> = _state.asStateFlow()
 
     init {
-
         _state.value = HomeScreenState(
             recentlyPlayed = getDummyRecentlyPlayed(),
             newSongs = getDummyRecentlyPlayed(),
-            currentTrack = getDummyRecentlyPlayed().first()
+            currentSong = getDummyRecentlyPlayed().first()
         )
     }
 
@@ -38,9 +40,9 @@ class HomeScreenViewModel : ViewModel() {
         )
     }
 
-    fun selectTrack(track: Track) {
+    fun selectSong(song: Song) {
         _state.value = _state.value.copy(
-            currentTrack = track,
+            currentSong = song,
             isPlaying = true
         )
     }

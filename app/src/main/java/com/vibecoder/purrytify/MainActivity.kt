@@ -18,6 +18,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.vibecoder.purrytify.presentation.features.auth.LoginScreen
 import com.vibecoder.purrytify.presentation.features.home.HomeScreen
+import com.vibecoder.purrytify.presentation.features.library.LibraryScreen
 import com.vibecoder.purrytify.presentation.features.splash.SplashViewModel
 import com.vibecoder.purrytify.presentation.theme.PurrytifyTheme
 import dagger.hilt.android.AndroidEntryPoint
@@ -29,7 +30,7 @@ import kotlinx.coroutines.launch
 object AppDestinations {
     const val LOGIN_ROUTE = "login"
     const val HOME_ROUTE = "home"
-    const val LOADING_ROUTE = "loading"
+    const val LIBRARY_ROUTE = "library"
 }
 
 @AndroidEntryPoint
@@ -54,12 +55,12 @@ class MainActivity : ComponentActivity() {
 fun AppNavigation(isAuthenticatedFlow: kotlinx.coroutines.flow.StateFlow<Boolean?>) {
     val navController = rememberNavController()
     val isAuthenticated by isAuthenticatedFlow.collectAsState()
-    val startDestination = if (isAuthenticated == false) {
-        AppDestinations.LOGIN_ROUTE
-    } else {
-        AppDestinations.HOME_ROUTE
-    }
-
+//    val startDestination = if (isAuthenticated == false) {
+//        AppDestinations.LOGIN_ROUTE
+//    } else {
+//        AppDestinations.HOME_ROUTE
+//    }
+    val startDestination = AppDestinations.LOGIN_ROUTE
     NavHost(
         navController = navController,
         startDestination = startDestination,
@@ -77,8 +78,13 @@ fun AppNavigation(isAuthenticatedFlow: kotlinx.coroutines.flow.StateFlow<Boolean
         composable(AppDestinations.HOME_ROUTE) {
             HomeScreen(
                 navController = navController,
-                currentRoute = AppDestinations.HOME_ROUTE,
             )
         }
+
+       composable(AppDestinations.LIBRARY_ROUTE) {
+           LibraryScreen(
+               navController = navController,
+           )
+       }
     }
 }

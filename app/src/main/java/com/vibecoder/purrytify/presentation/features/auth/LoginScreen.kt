@@ -52,128 +52,126 @@ fun LoginScreen(
         }
     }
 
-    PurrytifyTheme {
 
-        Surface(
-            modifier = Modifier.fillMaxSize(),
-            color = MaterialTheme.colorScheme.background
-        ) {
-            Box(modifier = Modifier.fillMaxSize()) {
-
-                // Box to hold the image and the gradient overlay
-                Box(modifier = Modifier
-                    .fillMaxWidth()
-                    .align(Alignment.TopCenter)
-                    .offset(y = 75.dp)
-                ) {
-
-                    Image(
-                        painter = painterResource(id = R.drawable.bron_bg),
-                        contentDescription = null,
-                        modifier = Modifier
-                            .fillMaxWidth(),
-                        contentScale = ContentScale.FillWidth
-                    )
-
-                    Box(
-                        modifier = Modifier
-                            .matchParentSize()
-                            .background(
-                                Brush.verticalGradient(
-                                    colors = listOf(Color.Transparent, Color.Black),
-                                    startY = 0f,
-                                    endY = Float.POSITIVE_INFINITY
-                                )
-                            )
-                    )
-                }
+    Surface(
+        modifier = Modifier.fillMaxSize(),
+        color = MaterialTheme.colorScheme.background
+    ) {
+        Box(modifier = Modifier.fillMaxSize()) {
 
 
+            Box(modifier = Modifier
+                .fillMaxWidth()
+                .align(Alignment.TopCenter)
+                .offset(y = 75.dp)
+            ) {
 
-                Column(
+                Image(
+                    painter = painterResource(id = R.drawable.bron_bg),
+                    contentDescription = null,
                     modifier = Modifier
-                        .fillMaxSize()
-                        .verticalScroll(rememberScrollState())
-                        .padding(top = 0.dp, start = 24.dp, end = 24.dp, bottom = 60.dp)
-                        .align(Alignment.TopCenter),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Bottom
-                ) {
+                        .fillMaxWidth(),
+                    contentScale = ContentScale.FillWidth
+                )
 
-
-                    Image(
-                        painter = painterResource(id = R.drawable.logo),
-                        contentDescription = stringResource(R.string.app_logo_description),
-                        modifier = Modifier.size(100.dp)
-                    )
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    // Headline Text
-                    Text(
-                        text = stringResource(R.string.login_headline),
-                        style = MaterialTheme.typography.displayMedium,
-                        color = MaterialTheme.colorScheme.onSecondary,
-                        textAlign = TextAlign.Center
-                    )
-
-                    Spacer(modifier = Modifier.height(32.dp))
-
-                    // Email Input
-                    TextInputComponent(
-                        value = state.email,
-                        onValueChange = viewModel::onEmailChange,
-                        label = stringResource(R.string.email_label),
-                        placeholderText = stringResource(R.string.email_placeholder),
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
-                        enabled = !state.isLoading
-                    )
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    // Password Input
-                    TextInputComponent(
-                        value = state.password,
-                        onValueChange = viewModel::onPasswordChange,
-                        label = stringResource(R.string.password_label),
-                        placeholderText = stringResource(R.string.password_placeholder),
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                        visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
-                        trailingIcon = {
-                            val image = if (passwordVisible) Icons.Filled.Visibility else Icons.Filled.VisibilityOff
-                            val description = if (passwordVisible) "Hide password" else "Show password"
-                            IconButton(onClick = { passwordVisible = !passwordVisible }) {
-                                Icon(imageVector = image, contentDescription = description)
-                            }
-                        },
-                        enabled = !state.isLoading
-                    )
-
-                    // 5. Display Error Message if it exists
-                    if (state.error != null) {
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = state.error!!,
-                            color = MaterialTheme.colorScheme.error,
-                            style = MaterialTheme.typography.bodyMedium,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp)
+                Box(
+                    modifier = Modifier
+                        .matchParentSize()
+                        .background(
+                            Brush.verticalGradient(
+                                colors = listOf(Color.Transparent, Color.Black),
+                                startY = 0f,
+                                endY = Float.POSITIVE_INFINITY
+                            )
                         )
-                    }
+                )
+            }
 
-                    Spacer(modifier = Modifier.height(32.dp))
 
-                    //  Login Button
-                    PrimaryButton(
-                        text = stringResource(R.string.login_button),
-                        onClick = { viewModel.login() },
-                        isLoading = state.isLoading,
-                        enabled = !state.isLoading
+
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(top = 0.dp, start = 24.dp, end = 24.dp, bottom = 60.dp)
+                    .align(Alignment.TopCenter),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Bottom
+            ) {
+
+
+                Image(
+                    painter = painterResource(id = R.drawable.logo),
+                    contentDescription = stringResource(R.string.app_logo_description),
+                    modifier = Modifier.size(100.dp)
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Headline Text
+                Text(
+                    text = stringResource(R.string.login_headline),
+                    style = MaterialTheme.typography.displayMedium,
+                    color = MaterialTheme.colorScheme.onSecondary,
+                    textAlign = TextAlign.Center
+                )
+
+                Spacer(modifier = Modifier.height(32.dp))
+
+                // Email Input
+                TextInputComponent(
+                    value = state.email,
+                    onValueChange = viewModel::onEmailChange,
+                    label = stringResource(R.string.email_label),
+                    placeholderText = stringResource(R.string.email_placeholder),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+                    enabled = !state.isLoading
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Password Input
+                TextInputComponent(
+                    value = state.password,
+                    onValueChange = viewModel::onPasswordChange,
+                    label = stringResource(R.string.password_label),
+                    placeholderText = stringResource(R.string.password_placeholder),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                    visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                    trailingIcon = {
+                        val image = if (passwordVisible) Icons.Filled.Visibility else Icons.Filled.VisibilityOff
+                        val description = if (passwordVisible) "Hide password" else "Show password"
+                        IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                            Icon(imageVector = image, contentDescription = description)
+                        }
+                    },
+                    enabled = !state.isLoading
+                )
+
+
+                if (state.error != null) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = state.error!!,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodyMedium,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp)
                     )
-
                 }
+
+                Spacer(modifier = Modifier.height(32.dp))
+
+                //  Login Button
+                PrimaryButton(
+                    text = stringResource(R.string.login_button),
+                    onClick = { viewModel.login() },
+                    isLoading = state.isLoading,
+                    enabled = !state.isLoading
+                )
+
             }
         }
     }
