@@ -1,10 +1,6 @@
 package com.vibecoder.purrytify.presentation.components
 
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -13,47 +9,45 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.PathEffect
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.vibecoder.purrytify.R 
-import com.vibecoder.purrytify.presentation.theme.DarkGray
-import com.vibecoder.purrytify.presentation.theme.Gray 
-import com.vibecoder.purrytify.presentation.theme.OutlineColor
-import com.vibecoder.purrytify.presentation.theme.White 
-
+import com.vibecoder.purrytify.R
+import com.vibecoder.purrytify.presentation.theme.Gray
+import com.vibecoder.purrytify.presentation.theme.White
+import java.util.concurrent.TimeUnit
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SongBottomSheet(
     isVisible: Boolean,
     onDismiss: () -> Unit,
+    // --- Input States ---
     title: String,
-    onSave: (title: String, artist: String) -> Unit,
+    artist: String,
+    audioFileName: String?,
+    coverFileName: String?,
+    durationMillis: Long?,
+    isLoading: Boolean,
+    error: String?,
+    // --- Callbacks ---
+    onTitleChange: (String) -> Unit,
+    onArtistChange: (String) -> Unit,
+    onSave: () -> Unit,
+    onAudioSelect: () -> Unit,
+    onCoverSelect: () -> Unit
 ) {
-    if (isVisible) {
-        
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.5f))
-                .clickable(onClick = onDismiss)
-        )
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
-       
+    if (isVisible) {
+
         ModalBottomSheet(
             onDismissRequest = onDismiss,
-            sheetState = rememberModalBottomSheetState(
-                skipPartiallyExpanded = true,
-            ),
+            sheetState = sheetState,
             modifier = Modifier
                 .fillMaxWidth()
-                .fillMaxHeight(0.7f),
+                .wrapContentHeight(),
             shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
             containerColor = MaterialTheme.colorScheme.surface,
             tonalElevation = 0.dp,
@@ -68,86 +62,105 @@ fun SongBottomSheet(
                 )
             }
         ) {
-            var titleState by remember { mutableStateOf("") }
-            var artistState by remember { mutableStateOf("") }
-
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 24.dp, vertical = 16.dp), 
-                horizontalAlignment = Alignment.CenterHorizontally 
+                    .padding(horizontal = 24.dp, vertical = 16.dp)
+                    .padding(bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
-                    text = title,
-                    style = MaterialTheme.typography.bodyLarge,
+                    text = "Upload Song",
+                    style = MaterialTheme.typography.titleLarge,
                     modifier = Modifier.padding(bottom = 24.dp)
                 )
 
-                
+                // --- Upload Boxes ---
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(bottom = 24.dp),
+                        .padding(bottom = 16.dp),
                     horizontalArrangement = Arrangement.SpaceEvenly
                 ) {
                     UploadBox(
-                        label = "Upload Photo",
+                        label = coverFileName ?: "Upload Cover",
                         iconRes = R.drawable.ic_img_placeholder,
-
-                        onClick = { /* TODO: Handle photo upload */ }
+                        isSelected = coverFileName != null,
+                        onClick = onCoverSelect,
+                        modifier = Modifier.weight(1f).padding(horizontal = 8.dp)
                     )
                     UploadBox(
-                        label = "Upload File",
+                        label = audioFileName ?: "Upload Audio",
                         iconRes = R.drawable.ic_song_placeholder,
-
-                        onClick = { /* TODO: Handle file upload */ }
+                        isSelected = audioFileName != null,
+                        onClick = onAudioSelect,
+                        modifier = Modifier.weight(1f).padding(horizontal = 8.dp)
                     )
                 }
 
-                
+                if (durationMillis != null && durationMillis > 0) {
+                    val formattedDuration = formatDuration(durationMillis)
+                    Text(
+                        text = "Duration: $formattedDuration",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.secondary,
+                        modifier = Modifier.padding(bottom = 16.dp).align(Alignment.Start)
+                    )
+                }
+
+
+
                 TextInputComponent(
-                    value = titleState,
-                    onValueChange = { titleState = it },
+                    value = title,
+                    onValueChange = onTitleChange,
                     label = "Title",
-                    placeholderText = "Title",
-                    modifier = Modifier.padding(bottom = 16.dp)
+                    placeholderText = "Enter song title",
+                    modifier = Modifier.padding(bottom = 16.dp),
+                    enabled = !isLoading
                 )
                 TextInputComponent(
-                    value = artistState,
-                    onValueChange = { artistState = it },
+                    value = artist,
+                    onValueChange = onArtistChange,
                     label = "Artist",
-                    placeholderText = "Artist",
-                    modifier = Modifier.padding(bottom = 32.dp) 
+                    placeholderText = "Enter artist name",
+                    modifier = Modifier.padding(bottom = 24.dp),
+                    enabled = !isLoading
                 )
 
-                
+
+                if (error != null) {
+                    Text(
+                        text = error,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodyMedium,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 16.dp)
+                    )
+                }
+
+
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(16.dp) 
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    
-                    Button(
+                    SecondaryButton(
                         onClick = onDismiss,
                         modifier = Modifier
-                            .weight(1f) 
+                            .weight(1f)
                             .height(48.dp),
-                        shape = MaterialTheme.shapes.large, 
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Gray, 
-                            contentColor = White 
-                        )
-                    ) {
-                        Text(
-                            text = "Cancel",
-                            style = MaterialTheme.typography.titleMedium
-                        )
-                    }
+                        enabled = !isLoading,
+                        text = "Cancel",
+                    )
 
-                  
+                    // Save Button
                     PrimaryButton(
                         text = "Save",
-                        onClick = { onSave(titleState, artistState) },
-                        modifier = Modifier.weight(1f) 
+                        onClick = onSave,
+                        modifier = Modifier.weight(1f),
+                        isLoading = isLoading,
+                        enabled = !isLoading
                     )
                 }
 
@@ -155,4 +168,12 @@ fun SongBottomSheet(
             }
         }
     }
+}
+
+
+private fun formatDuration(millis: Long): String {
+    val minutes = TimeUnit.MILLISECONDS.toMinutes(millis)
+    val seconds = TimeUnit.MILLISECONDS.toSeconds(millis) -
+            TimeUnit.MINUTES.toSeconds(minutes)
+    return String.format("%02d:%02d", minutes, seconds)
 }

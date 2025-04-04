@@ -31,7 +31,7 @@ fun SmallMusicCard(
     ) {
 
         Image(
-            painter = rememberAsyncImagePainter(model = "https://upload.wikimedia.org/wikipedia/en/3/39/The_Weeknd_-_Starboy.png"),
+            painter = rememberAsyncImagePainter(model = coverUrl),
             contentDescription = title,
             modifier = Modifier
                 .size(52.dp)

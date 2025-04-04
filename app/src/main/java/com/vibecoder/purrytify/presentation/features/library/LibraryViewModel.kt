@@ -1,127 +1,130 @@
 package com.vibecoder.purrytify.presentation.features.library
 
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.vibecoder.purrytify.domain.model.Song
+import com.vibecoder.purrytify.data.repository.SongRepository
+import com.vibecoder.purrytify.data.local.model.SongEntity
+import com.vibecoder.purrytify.util.Resource
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import android.util.Log
+
 
 
 data class LibraryScreenState(
-    val songs: List<Song> = emptyList(),
-    val currentPlayingSong: Song? = null,
+    val songs: List<SongEntity> = emptyList(),
+    val currentPlayingSong: SongEntity? = null,
     val isPlaying: Boolean = false,
-    val isCurrentSongFavorite: Boolean = false,
+
     val isBottomSheetVisible: Boolean = false,
-    val selectedTab: Int = 0
+    val selectedTab: Int = 0,
+    val isLoadingSongs: Boolean = true,
+    val libraryError: String? = null
 )
 
 @HiltViewModel
 class LibraryViewModel @Inject constructor(
-
+    private val songRepository: SongRepository
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(LibraryScreenState())
     val state: StateFlow<LibraryScreenState> = _state.asStateFlow()
 
 
-    var selectedTab by mutableIntStateOf(0)
-        private set
+    val isCurrentSongFavorite: StateFlow<Boolean> = _state.map { it.currentPlayingSong?.isLiked ?: false }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
-
-    val songs: List<Song> get() = _state.value.songs
-    val currentPlayingSong: Song? get() = _state.value.currentPlayingSong
-    val isPlaying: StateFlow<Boolean> = MutableStateFlow(_state.value.isPlaying)
-    val isCurrentSongFavorite: StateFlow<Boolean> = MutableStateFlow(_state.value.isCurrentSongFavorite)
-    val isBottomSheetVisible: StateFlow<Boolean> = MutableStateFlow(_state.value.isBottomSheetVisible)
-
+    // stateflow to observe the current playing song
+    val isPlaying: StateFlow<Boolean> = _state.map { it.isPlaying }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+    val isBottomSheetVisible: StateFlow<Boolean> = _state.map { it.isBottomSheetVisible }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+    val selectedTab: StateFlow<Int> = _state.map { it.selectedTab }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
+    val isLoadingSongs: StateFlow<Boolean> = _state.map { it.isLoadingSongs }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+    val libraryError: StateFlow<String?> = _state.map { it.libraryError }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
 
     init {
-
-        loadSongs()
-
-        _state.update { it.copy(currentPlayingSong = getDummyLibrarySongs().firstOrNull()) }
+        observeSongs()
     }
 
-    private fun loadSongs() {
+    private fun observeSongs() {
         viewModelScope.launch {
+            _state.flatMapLatest { currentState ->
+                when (currentState.selectedTab) {
+                    0 -> songRepository.getAllSongs()
+                    1 -> songRepository.getLikedSongs()
+                    else -> flowOf(emptyList())
+                }
+            }.catch { e ->
+                Log.e("LibraryVM", "Error observing songs", e)
+                _state.update { it.copy(libraryError = "Failed to load songs.", isLoadingSongs = false) }
+            }.collect { songsList ->
+                _state.update { currentState ->
 
-            val fetchedSongs = if (selectedTab == 0) {
-                getDummyLibrarySongs()
-            } else {
-                getDummyLibrarySongs().filter { it.title.contains("a", ignoreCase = true) }
+                    val updatedCurrentSong = currentState.currentPlayingSong?.let { current ->
+                        songsList.find { s -> s.id == current.id }
+                    } ?: currentState.currentPlayingSong
+
+                    currentState.copy(
+                        songs = songsList,
+                        isLoadingSongs = false,
+                        libraryError = null,
+                        currentPlayingSong = updatedCurrentSong
+
+                    )
+                }
             }
-            _state.update { it.copy(songs = fetchedSongs) }
         }
     }
 
     fun onTabSelected(index: Int) {
-        selectedTab = index
-        _state.update { it.copy(selectedTab = index) }
-        loadSongs()
+        if (_state.value.selectedTab != index) {
+            _state.update { it.copy(selectedTab = index, isLoadingSongs = true, libraryError = null) }
+        }
     }
 
-    fun onPlaySong(song: Song) {
+
+    fun onPlaySong(song: SongEntity) {
         _state.update {
             it.copy(
                 currentPlayingSong = song,
-                isPlaying = true,
+                isPlaying = true
 
-                isCurrentSongFavorite = song.title.contains("a", ignoreCase = true)
             )
         }
-        (isPlaying as MutableStateFlow).value = true
-        (isCurrentSongFavorite as MutableStateFlow).value = _state.value.isCurrentSongFavorite
     }
 
     fun togglePlayPause() {
-        val currentlyPlaying = ! _state.value.isPlaying
+
+        val currentlyPlaying = !_state.value.isPlaying
         _state.update { it.copy(isPlaying = currentlyPlaying) }
-        (isPlaying as MutableStateFlow).value = currentlyPlaying
     }
 
     fun toggleFavorite() {
-        _state.value.currentPlayingSong?.let {
-            val currentlyFavorite = !_state.value.isCurrentSongFavorite
+        viewModelScope.launch {
+            _state.value.currentPlayingSong?.let { song ->
+                val newLikedStatus = !song.isLiked
 
-            _state.update { currentState ->
-                currentState.copy(isCurrentSongFavorite = currentlyFavorite)
-            }
-            (isCurrentSongFavorite as MutableStateFlow).value = currentlyFavorite
-
-            if (selectedTab == 1 && !currentlyFavorite) {
-                loadSongs()
-            }
+                when (val result = songRepository.updateLikeStatus(song.id, newLikedStatus)) {
+                    is Resource.Success -> {
+                        // The state update will happen via the observeSongs flow catching the DB changes
+                        Log.d("LibraryVM", "Like status updated for ${song.id}")
+                    }
+                    is Resource.Error -> {
+                        Log.e("LibraryVM", "Failed to update like status for ${song.id}: ${result.message}")
+                    }
+                    else -> {}
+                }
+            } ?: Log.w("LibraryVM", "Toggle Favorite called but no song is playing.")
         }
     }
-     fun showBottomSheet() {
+
+    fun showBottomSheet() {
         _state.update { it.copy(isBottomSheetVisible = true) }
-        (isBottomSheetVisible as MutableStateFlow).value = true
     }
 
     fun hideBottomSheet() {
         _state.update { it.copy(isBottomSheetVisible = false) }
-        (isBottomSheetVisible as MutableStateFlow).value = false
-    }
-
-    // Dummy
-    private fun getDummyLibrarySongs(): List<Song> {
-        return listOf(
-            Song("lib1", "Stairway to Heaven", "Led Zeppelin", "https://upload.wikimedia.org/wikipedia/en/3/39/The_Weeknd_-_Starboy.png"),
-            Song("lib2", "Like a Rolling Stone", "Bob Dylan", "https://example.com/lib2.jpg"),
-            Song("lib3", "Hotel California", "Eagles", "https://example.com/lib3.jpg"),
-            Song("lib4", "Sweet Child o' Mine", "Guns N' Roses", "https://example.com/lib4.jpg"),
-            Song("lib5", "Imagine", "John Lennon", "https://example.com/lib5.jpg")
-        )
     }
 }

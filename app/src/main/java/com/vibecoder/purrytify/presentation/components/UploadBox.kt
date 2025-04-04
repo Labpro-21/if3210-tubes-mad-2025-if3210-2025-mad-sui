@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -22,25 +23,30 @@ import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.vibecoder.purrytify.presentation.theme.OutlineColor
+
 
 
 @Composable
 fun UploadBox(
     label: String,
     iconRes: Int,
+    isSelected: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val stroke = Stroke(
         width = 2f,
-        pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 10f), 0f)
+        pathEffect = if (!isSelected) PathEffect.dashPathEffect(floatArrayOf(10f, 10f), 0f) else null
     )
+    val outlineColor = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
+    val contentColor = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary
 
     Box(
         modifier = modifier
-            .size(140.dp)
+            .height(140.dp)
+            .widthIn(min = 120.dp)
             .clip(RoundedCornerShape(12.dp))
             .clickable(onClick = onClick)
             .padding(1.dp),
@@ -49,7 +55,7 @@ fun UploadBox(
 
         Canvas(modifier = Modifier.matchParentSize()) {
             drawRoundRect(
-                color = OutlineColor,
+                color = outlineColor,
                 style = stroke,
                 cornerRadius = CornerRadius(12.dp.toPx())
             )
@@ -63,18 +69,19 @@ fun UploadBox(
         ) {
             Icon(
                 painter = painterResource(id = iconRes),
-                contentDescription = label,
+                contentDescription = null,
                 modifier = Modifier.size(48.dp),
-                tint = MaterialTheme.colorScheme.secondary
+                tint = contentColor
             )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
                 text = label,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.secondary,
-                textAlign = TextAlign.Center
+                style = MaterialTheme.typography.bodySmall,
+                color = contentColor,
+                textAlign = TextAlign.Center,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
             )
         }
-
     }
 }

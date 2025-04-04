@@ -8,27 +8,32 @@ import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 import coil.load
 import com.vibecoder.purrytify.R
-import com.vibecoder.purrytify.domain.model.Song
+import com.vibecoder.purrytify.data.local.model.SongEntity
 
 class SongAdapter(
-    private var songs: List<Song>,
-    private val onItemClick: (Song) -> Unit
+
+    private var songs: List<SongEntity>,
+
+    private val onItemClick: (SongEntity) -> Unit
 ) : RecyclerView.Adapter<SongAdapter.SongViewHolder>() {
 
     inner class SongViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
-        val songCover: ImageView = itemView.findViewById(R.id.songCover)
-        val songTitle: TextView = itemView.findViewById(R.id.songTitle)
-        val songArtist: TextView = itemView.findViewById(R.id.songArtist)
 
-        fun bind(song: Song) {
-            println("Song title view: $songTitle")
-            println("Song artist view: $songArtist")
-            songTitle?.text = song.title ?: "No title"
-            songArtist?.text = song.artist ?: "No artist"
-            songCover.load(song.coverUrl) {
+        private val songCover: ImageView = itemView.findViewById(R.id.songCover)
+        private val songTitle: TextView = itemView.findViewById(R.id.songTitle)
+        private val songArtist: TextView = itemView.findViewById(R.id.songArtist)
+
+
+        fun bind(song: SongEntity) {
+            songTitle.text = song.title
+            songArtist.text = song.artist
+
+            songCover.load(song.coverArtUri) {
                 crossfade(true)
-
+                placeholder(R.drawable.ic_song_placeholder)
+                error(R.drawable.ic_song_placeholder)
             }
+
             itemView.setOnClickListener { onItemClick(song) }
         }
     }
@@ -46,7 +51,8 @@ class SongAdapter(
     override fun getItemCount(): Int = songs.size
 
 
-    fun updateSongs(newSongs: List<Song>) {
+    fun updateSongs(newSongs: List<SongEntity>) {
+
         songs = newSongs
         notifyDataSetChanged()
     }

@@ -19,7 +19,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.vibecoder.purrytify.presentation.theme.Black
+import com.vibecoder.purrytify.presentation.theme.DarkGray
+import com.vibecoder.purrytify.presentation.theme.Gray
 import com.vibecoder.purrytify.presentation.theme.Green
+import com.vibecoder.purrytify.presentation.theme.LightGray
 import com.vibecoder.purrytify.presentation.theme.White
 
 
@@ -81,7 +84,7 @@ fun SecondaryButton(
             contentColor = White,
             disabledContentColor = White.copy(alpha = 0.5f)
         ),
-        border = BorderStroke(1.dp, White)
+        border = BorderStroke(1.dp, LightGray)
     ) {
         Text(
             text = text,

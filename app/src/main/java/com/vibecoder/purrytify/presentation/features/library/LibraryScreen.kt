@@ -1,6 +1,11 @@
 package com.vibecoder.purrytify.presentation.features.library
 
-import androidx.navigation.NavController
+import android.Manifest
+import android.net.Uri
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -9,48 +14,58 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
-import com.vibecoder.purrytify.presentation.components.MinimizedMusicPlayer
-import androidx.recyclerview.widget.RecyclerView
-import androidx.compose.ui.viewinterop.AndroidView
-import androidx.recyclerview.widget.LinearLayoutManager
-import androidx.compose.foundation.background
-import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.compose.runtime.collectAsState
-
-import com.vibecoder.purrytify.domain.model.Song
-import com.vibecoder.purrytify.presentation.components.BottomNavigationBar
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.navigation.NavController
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
+import com.google.accompanist.permissions.ExperimentalPermissionsApi
+import com.google.accompanist.permissions.isGranted
+import com.google.accompanist.permissions.rememberPermissionState
+import com.vibecoder.purrytify.presentation.components.BottomNavigationBar
+import com.vibecoder.purrytify.presentation.components.MinimizedMusicPlayer
 import com.vibecoder.purrytify.presentation.components.SongBottomSheet
 
-
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalPermissionsApi::class)
 @Composable
 fun LibraryScreen(
     navController: NavController,
-    viewModel: LibraryViewModel = hiltViewModel()
+    libraryViewModel: LibraryViewModel = hiltViewModel()
 ) {
-    val tabs = listOf("All", "Liked")
-    val songs = viewModel.songs
-    val currentSong = viewModel.currentPlayingSong
-    val isPlaying by viewModel.isPlaying.collectAsState()
-    val isFavorite by viewModel.isCurrentSongFavorite.collectAsState()
-    val selectedTab = viewModel.selectedTab
-    val isBottomSheetVisible by viewModel.isBottomSheetVisible.collectAsState()
+    val libraryState by libraryViewModel.state.collectAsStateWithLifecycle()
+    val isCurrentFavorite by libraryViewModel.isCurrentSongFavorite.collectAsStateWithLifecycle()
 
+    val tabs = listOf("All", "Liked")
+
+    val permission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        Manifest.permission.READ_MEDIA_AUDIO
+    } else {
+        Manifest.permission.READ_EXTERNAL_STORAGE
+    }
+    val permissionState = rememberPermissionState(permission)
+
+    // keep track of the adapter instance
+    val songAdapter = remember {
+        SongAdapter(emptyList(), libraryViewModel::onPlaySong)
+    }
 
     Scaffold(
         bottomBar = {
             Column {
-                currentSong?.let { song ->
+                libraryState.currentPlayingSong?.let { song ->
                     MinimizedMusicPlayer(
                         title = song.title,
                         artist = song.artist,
-                        coverUrl = song.coverUrl,
-                        isPlaying = isPlaying,
-                        isFavorite = isFavorite,
-                        onPlayPauseClick = { viewModel.togglePlayPause() },
-                        onFavoriteClick = { viewModel.toggleFavorite() },
-                        onPlayerClick = { navController.navigate("player") }
+                        coverUrl = song.coverArtUri ?: "",
+                        isPlaying = libraryState.isPlaying,
+                        isFavorite = song.isLiked,
+                        onPlayPauseClick = libraryViewModel::togglePlayPause,
+                        onFavoriteClick = libraryViewModel::toggleFavorite,
+                        onPlayerClick = { /* Navigate to full player */ } //TODO
                     )
                 }
                 BottomNavigationBar(navController = navController)
@@ -77,10 +92,17 @@ fun LibraryScreen(
                     style = MaterialTheme.typography.displaySmall,
                     color = MaterialTheme.colorScheme.onBackground
                 )
-                IconButton(onClick = { viewModel.showBottomSheet() }) {
-                    Icon(Icons.Filled.Add, contentDescription = "Add to library")
+                IconButton(onClick = {
+                    if (permissionState.status.isGranted) {
+                        libraryViewModel.showBottomSheet()
+                    } else {
+                        permissionState.launchPermissionRequest()
+                    }
+                }) {
+                    Icon(Icons.Filled.Add, contentDescription = "Add Song")
                 }
             }
+
 
 
             Row(
@@ -89,18 +111,17 @@ fun LibraryScreen(
                     .padding(vertical = 8.dp)
             ) {
                 TabRow(
-                    selectedTabIndex = selectedTab,
-                    modifier = Modifier.fillMaxWidth(),
+                    selectedTabIndex = libraryState.selectedTab,modifier = Modifier.fillMaxWidth(),
                     containerColor = MaterialTheme.colorScheme.background,
                     contentColor = MaterialTheme.colorScheme.primary,
-                    indicator = { },
-                    divider = { }
-                ) {
+                    divider = { },
+                    indicator = {}
+                    ) {
                     tabs.forEachIndexed { index, title ->
-                        val isSelected = selectedTab == index
+                        val isSelected = libraryState.selectedTab == index
                         Tab(
                             selected = isSelected,
-                            onClick = { viewModel.onTabSelected(index) },
+                            onClick = { libraryViewModel.onTabSelected(index) },
                             modifier = Modifier
                                 .padding(horizontal = 4.dp)
                                 .height(32.dp)
@@ -123,30 +144,98 @@ fun LibraryScreen(
                 }
             }
 
+            HorizontalDivider(modifier = Modifier.padding(top = 8.dp))
 
-            HorizontalDivider()
-
-
-            AndroidView(
-                factory = { context ->
-                    RecyclerView(context).apply {
-                        layoutManager = LinearLayoutManager(context)
-                        adapter = SongAdapter(emptyList(), viewModel::onPlaySong)
+            when {
+                libraryState.isLoadingSongs -> {
+                    Box(modifier = Modifier.fillMaxSize().weight(1f), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator()
                     }
-                },
-                update = { recyclerView ->
+                }
+                libraryState.libraryError != null -> {
+                    Box(modifier = Modifier.fillMaxSize().weight(1f), contentAlignment = Alignment.Center) {
+                        Text("Error: ${libraryState.libraryError}", color = MaterialTheme.colorScheme.error)
+                    }
+                }
+                libraryState.songs.isEmpty() && !libraryState.isLoadingSongs -> {
+                    Box(modifier = Modifier.fillMaxSize().weight(1f).padding(16.dp), contentAlignment = Alignment.Center) {
+                        Text(
+                            if (libraryState.selectedTab == 0) "Your library is empty. Add some songs!"
+                            else "You haven't liked any songs yet.",
+                            color = MaterialTheme.colorScheme.secondary,
+                            style = MaterialTheme.typography.bodyLarge
+                        )
+                    }
+                }
+                else -> {
 
-                    (recyclerView.adapter as? SongAdapter)?.updateSongs(songs)
+                    AndroidView(
+                        factory = { context ->
+                            RecyclerView(context).apply {
+                                layoutManager = LinearLayoutManager(context)
+                                adapter = songAdapter
+                            }
+                        },
+
+                        update = { recyclerView ->
+                            songAdapter.updateSongs(libraryState.songs)
+                        },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
+        }
+
+
+        if (libraryState.isBottomSheetVisible) {
+            val bottomSheetViewModel: SongBottomSheetViewModel = hiltViewModel()
+            val bottomSheetState by bottomSheetViewModel.state.collectAsStateWithLifecycle()
+
+            //  contract
+            val audioPickerLauncher = rememberLauncherForActivityResult(
+                contract = ActivityResultContracts.GetContent(),
+                onResult = { uri: Uri? ->
+                    bottomSheetViewModel.setAudioFileUri(uri)
+                }
+            )
+
+
+            val imagePickerLauncher = rememberLauncherForActivityResult(
+                contract = ActivityResultContracts.GetContent(),
+                onResult = { uri: Uri? ->
+                    bottomSheetViewModel.setCoverImageUri(uri)
+                }
+            )
+
+            LaunchedEffect(Unit) { /*  permission request  */ }
+            LaunchedEffect(Unit) {
+                bottomSheetViewModel.eventFlow.collect { event ->
+                    when (event) {
+                        is SheetEvent.SaveSuccess -> libraryViewModel.hideBottomSheet()
+                        is SheetEvent.Dismiss -> libraryViewModel.hideBottomSheet()
+                    }
+                }
+            }
+
+            SongBottomSheet(
+                isVisible = true,
+                onDismiss = bottomSheetViewModel::dismiss,
+                title = bottomSheetState.title,
+                artist = bottomSheetState.artist,
+                audioFileName = bottomSheetState.audioFileName,
+                coverFileName = bottomSheetState.coverFileName,
+                durationMillis = bottomSheetState.durationMs,
+                isLoading = bottomSheetState.isLoading,
+                error = bottomSheetState.error,
+                onTitleChange = bottomSheetViewModel::updateTitle,
+                onArtistChange = bottomSheetViewModel::updateArtist,
+                onSave = bottomSheetViewModel::saveSong,
+                onAudioSelect = {
+                    if (permissionState.status.isGranted) { audioPickerLauncher.launch("audio/*") }
+                    else { permissionState.launchPermissionRequest() }
                 },
-                modifier = Modifier.weight(1f)
+                onCoverSelect = { imagePickerLauncher.launch("image/*") }
             )
         }
-        SongBottomSheet(
-            isVisible = isBottomSheetVisible,
-            onDismiss = { viewModel.hideBottomSheet() },
-            title = "Upload Song",
-            onSave = { title: String, artist: String -> {} }
-        )
     }
 }
-

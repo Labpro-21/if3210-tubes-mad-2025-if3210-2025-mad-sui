@@ -74,6 +74,7 @@ dependencies {
 
     implementation(libs.androidx.room.runtime)
     ksp(libs.androidx.room.compiler)
+    implementation(libs.androidx.room.ktx)
 
     // hilt
     implementation(libs.hilt.android)
@@ -90,4 +91,8 @@ dependencies {
     implementation(libs.androidx.constraintlayout)
     implementation(libs.androidx.constraintlayout.compose)
     implementation(libs.androidx.cardview)
+
+
+    implementation(libs.accompanist.permissions)
+
 }

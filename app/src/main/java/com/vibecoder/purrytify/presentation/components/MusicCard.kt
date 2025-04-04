@@ -38,7 +38,7 @@ fun MusicCard(
     ) {
         Column {
             AsyncImage(
-                model = "https://upload.wikimedia.org/wikipedia/en/3/39/The_Weeknd_-_Starboy.png",
+                model = coverUrl,
                 contentDescription = "$title by $artist",
                 modifier = Modifier
                     .fillMaxWidth()
