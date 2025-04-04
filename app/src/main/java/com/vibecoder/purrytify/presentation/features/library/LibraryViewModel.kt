@@ -21,6 +21,7 @@ data class LibraryScreenState(
     val currentPlayingSong: Song? = null,
     val isPlaying: Boolean = false,
     val isCurrentSongFavorite: Boolean = false,
+    val isBottomSheetVisible: Boolean = false,
     val selectedTab: Int = 0
 )
 
@@ -41,6 +42,8 @@ class LibraryViewModel @Inject constructor(
     val currentPlayingSong: Song? get() = _state.value.currentPlayingSong
     val isPlaying: StateFlow<Boolean> = MutableStateFlow(_state.value.isPlaying)
     val isCurrentSongFavorite: StateFlow<Boolean> = MutableStateFlow(_state.value.isCurrentSongFavorite)
+    val isBottomSheetVisible: StateFlow<Boolean> = MutableStateFlow(_state.value.isBottomSheetVisible)
+
 
 
     init {
@@ -100,6 +103,15 @@ class LibraryViewModel @Inject constructor(
                 loadSongs()
             }
         }
+    }
+     fun showBottomSheet() {
+        _state.update { it.copy(isBottomSheetVisible = true) }
+        (isBottomSheetVisible as MutableStateFlow).value = true
+    }
+
+    fun hideBottomSheet() {
+        _state.update { it.copy(isBottomSheetVisible = false) }
+        (isBottomSheetVisible as MutableStateFlow).value = false
     }
 
     // Dummy

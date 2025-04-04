@@ -60,7 +60,7 @@ fun AppNavigation(isAuthenticatedFlow: kotlinx.coroutines.flow.StateFlow<Boolean
 //    } else {
 //        AppDestinations.HOME_ROUTE
 //    }
-    val startDestination = AppDestinations.LOGIN_ROUTE
+    val startDestination = AppDestinations.HOME_ROUTE
     NavHost(
         navController = navController,
         startDestination = startDestination,

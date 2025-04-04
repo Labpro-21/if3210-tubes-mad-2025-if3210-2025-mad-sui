@@ -21,6 +21,7 @@ import androidx.compose.runtime.collectAsState
 import com.vibecoder.purrytify.domain.model.Song
 import com.vibecoder.purrytify.presentation.components.BottomNavigationBar
 import androidx.compose.ui.graphics.Color
+import com.vibecoder.purrytify.presentation.components.SongBottomSheet
 
 
 @Composable
@@ -34,6 +35,8 @@ fun LibraryScreen(
     val isPlaying by viewModel.isPlaying.collectAsState()
     val isFavorite by viewModel.isCurrentSongFavorite.collectAsState()
     val selectedTab = viewModel.selectedTab
+    val isBottomSheetVisible by viewModel.isBottomSheetVisible.collectAsState()
+
 
     Scaffold(
         bottomBar = {
@@ -74,7 +77,7 @@ fun LibraryScreen(
                     style = MaterialTheme.typography.displaySmall,
                     color = MaterialTheme.colorScheme.onBackground
                 )
-                IconButton(onClick = { /* TODO: Navigate to add songs screen */ }) {
+                IconButton(onClick = { viewModel.showBottomSheet() }) {
                     Icon(Icons.Filled.Add, contentDescription = "Add to library")
                 }
             }
@@ -138,6 +141,12 @@ fun LibraryScreen(
                 modifier = Modifier.weight(1f)
             )
         }
+        SongBottomSheet(
+            isVisible = isBottomSheetVisible,
+            onDismiss = { viewModel.hideBottomSheet() },
+            title = "Upload Song",
+            onSave = { title: String, artist: String -> {} }
+        )
     }
 }
 
