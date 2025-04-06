@@ -10,14 +10,11 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 import android.util.Log
-
+import com.vibecoder.purrytify.playback.PlaybackStateManager
 
 
 data class LibraryScreenState(
     val songs: List<SongEntity> = emptyList(),
-    val currentPlayingSong: SongEntity? = null,
-    val isPlaying: Boolean = false,
-
     val isBottomSheetVisible: Boolean = false,
     val selectedTab: Int = 0,
     val isLoadingSongs: Boolean = true,
@@ -26,52 +23,62 @@ data class LibraryScreenState(
 
 @HiltViewModel
 class LibraryViewModel @Inject constructor(
-    private val songRepository: SongRepository
+    private val songRepository: SongRepository,
+    private val playbackStateManager: PlaybackStateManager
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(LibraryScreenState())
     val state: StateFlow<LibraryScreenState> = _state.asStateFlow()
 
 
-    val isCurrentSongFavorite: StateFlow<Boolean> = _state.map { it.currentPlayingSong?.isLiked ?: false }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+    private val _selectedTab = MutableStateFlow(0)
 
-    // stateflow to observe the current playing song
-    val isPlaying: StateFlow<Boolean> = _state.map { it.isPlaying }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
-    val isBottomSheetVisible: StateFlow<Boolean> = _state.map { it.isBottomSheetVisible }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
-    val selectedTab: StateFlow<Int> = _state.map { it.selectedTab }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
-    val isLoadingSongs: StateFlow<Boolean> = _state.map { it.isLoadingSongs }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
-    val libraryError: StateFlow<String?> = _state.map { it.libraryError }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
-
+    private val currentSong = playbackStateManager.currentSong
 
     init {
-        observeSongs()
+      // tab changes
+        viewModelScope.launch {
+            _selectedTab.collect { tabIndex ->
+                _state.update { it.copy(selectedTab = tabIndex, isLoadingSongs = true) }
+                loadSongsForCurrentTab()
+            }
+        }
+
+        // song changes (favorite/unfavorite)
+        viewModelScope.launch {
+            currentSong.collect { song ->
+
+                if (song != null) {
+                    refreshSongs()
+                }
+            }
+        }
     }
 
-    private fun observeSongs() {
+    private fun loadSongsForCurrentTab() {
         viewModelScope.launch {
-            _state.flatMapLatest { currentState ->
-                when (currentState.selectedTab) {
+            try {
+                val songsFlow = when (_selectedTab.value) {
                     0 -> songRepository.getAllSongs()
                     1 -> songRepository.getLikedSongs()
-                    else -> flowOf(emptyList())
+                    else -> flow { emit(emptyList<SongEntity>()) }
                 }
-            }.catch { e ->
-                Log.e("LibraryVM", "Error observing songs", e)
-                _state.update { it.copy(libraryError = "Failed to load songs.", isLoadingSongs = false) }
-            }.collect { songsList ->
-                _state.update { currentState ->
 
-                    val updatedCurrentSong = currentState.currentPlayingSong?.let { current ->
-                        songsList.find { s -> s.id == current.id }
-                    } ?: currentState.currentPlayingSong
-
-                    currentState.copy(
-                        songs = songsList,
+                songsFlow.collect { songs ->
+                    _state.update {
+                        it.copy(
+                            songs = songs,
+                            isLoadingSongs = false,
+                            libraryError = null
+                        )
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("LibraryVM", "Error loading songs", e)
+                _state.update {
+                    it.copy(
                         isLoadingSongs = false,
-                        libraryError = null,
-                        currentPlayingSong = updatedCurrentSong
-
+                        libraryError = "Failed to load songs: ${e.localizedMessage}"
                     )
                 }
             }
@@ -79,44 +86,19 @@ class LibraryViewModel @Inject constructor(
     }
 
     fun onTabSelected(index: Int) {
-        if (_state.value.selectedTab != index) {
-            _state.update { it.copy(selectedTab = index, isLoadingSongs = true, libraryError = null) }
+        if (_selectedTab.value != index) {
+            _selectedTab.value = index
         }
     }
-
 
     fun onPlaySong(song: SongEntity) {
-        _state.update {
-            it.copy(
-                currentPlayingSong = song,
-                isPlaying = true
-
-            )
-        }
+        playbackStateManager.playSong(song)
     }
 
-    fun togglePlayPause() {
 
-        val currentlyPlaying = !_state.value.isPlaying
-        _state.update { it.copy(isPlaying = currentlyPlaying) }
-    }
-
-    fun toggleFavorite() {
+    fun refreshSongs() {
         viewModelScope.launch {
-            _state.value.currentPlayingSong?.let { song ->
-                val newLikedStatus = !song.isLiked
-
-                when (val result = songRepository.updateLikeStatus(song.id, newLikedStatus)) {
-                    is Resource.Success -> {
-                        // The state update will happen via the observeSongs flow catching the DB changes
-                        Log.d("LibraryVM", "Like status updated for ${song.id}")
-                    }
-                    is Resource.Error -> {
-                        Log.e("LibraryVM", "Failed to update like status for ${song.id}: ${result.message}")
-                    }
-                    else -> {}
-                }
-            } ?: Log.w("LibraryVM", "Toggle Favorite called but no song is playing.")
+            loadSongsForCurrentTab()
         }
     }
 
@@ -124,7 +106,10 @@ class LibraryViewModel @Inject constructor(
         _state.update { it.copy(isBottomSheetVisible = true) }
     }
 
-    fun hideBottomSheet() {
+    fun hideBottomSheet(refreshList: Boolean = false) {
         _state.update { it.copy(isBottomSheetVisible = false) }
+        if (refreshList) {
+            refreshSongs()
+        }
     }
 }

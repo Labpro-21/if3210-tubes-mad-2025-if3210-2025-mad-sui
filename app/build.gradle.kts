@@ -86,13 +86,15 @@ dependencies {
     implementation (libs.converter.gson)
     implementation(libs.logging.interceptor)
 
+    // media3
+    implementation(libs.androidx.media3.session)
+    implementation(libs.androidx.media3.exoplayer)
+
     implementation(libs.androidx.palette.ktx)
 
     implementation(libs.androidx.constraintlayout)
     implementation(libs.androidx.constraintlayout.compose)
     implementation(libs.androidx.cardview)
-
-
     implementation(libs.accompanist.permissions)
 
 }

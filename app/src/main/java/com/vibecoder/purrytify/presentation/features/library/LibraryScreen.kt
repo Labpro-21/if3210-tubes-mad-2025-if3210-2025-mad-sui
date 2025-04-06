@@ -33,12 +33,9 @@ import com.vibecoder.purrytify.presentation.components.SongBottomSheet
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalPermissionsApi::class)
 @Composable
 fun LibraryScreen(
-    navController: NavController,
     libraryViewModel: LibraryViewModel = hiltViewModel()
 ) {
     val libraryState by libraryViewModel.state.collectAsStateWithLifecycle()
-    val isCurrentFavorite by libraryViewModel.isCurrentSongFavorite.collectAsStateWithLifecycle()
-
     val tabs = listOf("All", "Liked")
 
     val permission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -48,194 +45,201 @@ fun LibraryScreen(
     }
     val permissionState = rememberPermissionState(permission)
 
-    // keep track of the adapter instance
     val songAdapter = remember {
         SongAdapter(emptyList(), libraryViewModel::onPlaySong)
     }
 
-    Scaffold(
-        bottomBar = {
-            Column {
-                libraryState.currentPlayingSong?.let { song ->
-                    MinimizedMusicPlayer(
-                        title = song.title,
-                        artist = song.artist,
-                        coverUrl = song.coverArtUri ?: "",
-                        isPlaying = libraryState.isPlaying,
-                        isFavorite = song.isLiked,
-                        onPlayPauseClick = libraryViewModel::togglePlayPause,
-                        onFavoriteClick = libraryViewModel::toggleFavorite,
-                        onPlayerClick = { /* Navigate to full player */ } //TODO
-                    )
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+            .padding(horizontal = 16.dp)
+    ) {
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                text = "Your Library",
+                style = MaterialTheme.typography.displaySmall,
+                color = MaterialTheme.colorScheme.onBackground
+            )
+            IconButton(onClick = {
+                if (permissionState.status.isGranted) {
+                    libraryViewModel.showBottomSheet()
+                } else {
+                    permissionState.launchPermissionRequest()
                 }
-                BottomNavigationBar(navController = navController)
+            }) {
+                Icon(Icons.Filled.Add, contentDescription = "Add Song")
             }
         }
-    ) { innerPadding ->
-        Column(
+
+
+
+        Row(
             modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .background(MaterialTheme.colorScheme.background)
-                .padding(horizontal = 16.dp)
+                .fillMaxWidth(fraction = 0.4f)
+                .padding(vertical = 8.dp)
         ) {
-
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 16.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
+            TabRow(
+                selectedTabIndex = libraryState.selectedTab, modifier = Modifier.fillMaxWidth(),
+                containerColor = MaterialTheme.colorScheme.background,
+                contentColor = MaterialTheme.colorScheme.primary,
+                divider = { },
+                indicator = {}
             ) {
-                Text(
-                    text = "Your Library",
-                    style = MaterialTheme.typography.displaySmall,
-                    color = MaterialTheme.colorScheme.onBackground
-                )
-                IconButton(onClick = {
-                    if (permissionState.status.isGranted) {
-                        libraryViewModel.showBottomSheet()
-                    } else {
-                        permissionState.launchPermissionRequest()
-                    }
-                }) {
-                    Icon(Icons.Filled.Add, contentDescription = "Add Song")
-                }
-            }
+                tabs.forEachIndexed { index, title ->
+                    val isSelected = libraryState.selectedTab == index
+                    Tab(
+                        selected = isSelected,
+                        onClick = { libraryViewModel.onTabSelected(index) },
+                        modifier = Modifier
+                            .padding(horizontal = 4.dp)
+                            .height(32.dp)
+                            .background(
 
+                                color = if (isSelected) MaterialTheme.colorScheme.primary else Color.DarkGray,
+                                shape = RoundedCornerShape(16.dp)
+                            ),
 
-
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth(fraction = 0.4f)
-                    .padding(vertical = 8.dp)
-            ) {
-                TabRow(
-                    selectedTabIndex = libraryState.selectedTab,modifier = Modifier.fillMaxWidth(),
-                    containerColor = MaterialTheme.colorScheme.background,
-                    contentColor = MaterialTheme.colorScheme.primary,
-                    divider = { },
-                    indicator = {}
+                        selectedContentColor = Color.Black,
+                        unselectedContentColor = Color.White
                     ) {
-                    tabs.forEachIndexed { index, title ->
-                        val isSelected = libraryState.selectedTab == index
-                        Tab(
-                            selected = isSelected,
-                            onClick = { libraryViewModel.onTabSelected(index) },
-                            modifier = Modifier
-                                .padding(horizontal = 4.dp)
-                                .height(32.dp)
-                                .background(
-
-                                    color = if (isSelected) MaterialTheme.colorScheme.primary else Color.DarkGray,
-                                    shape = RoundedCornerShape(16.dp)
-                                ),
-
-                            selectedContentColor = Color.Black,
-                            unselectedContentColor = Color.White
-                        ) {
-                            Text(
-                                text = title,
-                                modifier = Modifier.padding(horizontal = 12.dp),
-                                style = MaterialTheme.typography.labelLarge
-                            )
-                        }
-                    }
-                }
-            }
-
-            HorizontalDivider(modifier = Modifier.padding(top = 8.dp))
-
-            when {
-                libraryState.isLoadingSongs -> {
-                    Box(modifier = Modifier.fillMaxSize().weight(1f), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator()
-                    }
-                }
-                libraryState.libraryError != null -> {
-                    Box(modifier = Modifier.fillMaxSize().weight(1f), contentAlignment = Alignment.Center) {
-                        Text("Error: ${libraryState.libraryError}", color = MaterialTheme.colorScheme.error)
-                    }
-                }
-                libraryState.songs.isEmpty() && !libraryState.isLoadingSongs -> {
-                    Box(modifier = Modifier.fillMaxSize().weight(1f).padding(16.dp), contentAlignment = Alignment.Center) {
                         Text(
-                            if (libraryState.selectedTab == 0) "Your library is empty. Add some songs!"
-                            else "You haven't liked any songs yet.",
-                            color = MaterialTheme.colorScheme.secondary,
-                            style = MaterialTheme.typography.bodyLarge
+                            text = title,
+                            modifier = Modifier.padding(horizontal = 12.dp),
+                            style = MaterialTheme.typography.labelLarge
                         )
                     }
                 }
-                else -> {
+            }
+        }
 
-                    AndroidView(
-                        factory = { context ->
-                            RecyclerView(context).apply {
-                                layoutManager = LinearLayoutManager(context)
-                                adapter = songAdapter
-                            }
-                        },
+        HorizontalDivider(modifier = Modifier.padding(top = 8.dp))
 
-                        update = { recyclerView ->
-                            songAdapter.updateSongs(libraryState.songs)
-                        },
-                        modifier = Modifier.weight(1f)
+        when {
+            libraryState.isLoadingSongs -> {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .weight(1f),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator()
+                }
+            }
+
+            libraryState.libraryError != null -> {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .weight(1f),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        "Error: ${libraryState.libraryError}",
+                        color = MaterialTheme.colorScheme.error
                     )
                 }
             }
-        }
 
-
-        if (libraryState.isBottomSheetVisible) {
-            val bottomSheetViewModel: SongBottomSheetViewModel = hiltViewModel()
-            val bottomSheetState by bottomSheetViewModel.state.collectAsStateWithLifecycle()
-
-            //  contract
-            val audioPickerLauncher = rememberLauncherForActivityResult(
-                contract = ActivityResultContracts.GetContent(),
-                onResult = { uri: Uri? ->
-                    bottomSheetViewModel.setAudioFileUri(uri)
-                }
-            )
-
-
-            val imagePickerLauncher = rememberLauncherForActivityResult(
-                contract = ActivityResultContracts.GetContent(),
-                onResult = { uri: Uri? ->
-                    bottomSheetViewModel.setCoverImageUri(uri)
-                }
-            )
-
-            LaunchedEffect(Unit) { /*  permission request  */ }
-            LaunchedEffect(Unit) {
-                bottomSheetViewModel.eventFlow.collect { event ->
-                    when (event) {
-                        is SheetEvent.SaveSuccess -> libraryViewModel.hideBottomSheet()
-                        is SheetEvent.Dismiss -> libraryViewModel.hideBottomSheet()
-                    }
+            libraryState.songs.isEmpty() && !libraryState.isLoadingSongs -> {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .weight(1f)
+                        .padding(16.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        if (libraryState.selectedTab == 0) "Your library is empty. Add some songs!"
+                        else "You haven't liked any songs yet.",
+                        color = MaterialTheme.colorScheme.secondary,
+                        style = MaterialTheme.typography.bodyLarge
+                    )
                 }
             }
 
-            SongBottomSheet(
-                isVisible = true,
-                onDismiss = bottomSheetViewModel::dismiss,
-                title = bottomSheetState.title,
-                artist = bottomSheetState.artist,
-                audioFileName = bottomSheetState.audioFileName,
-                coverFileName = bottomSheetState.coverFileName,
-                durationMillis = bottomSheetState.durationMs,
-                isLoading = bottomSheetState.isLoading,
-                error = bottomSheetState.error,
-                onTitleChange = bottomSheetViewModel::updateTitle,
-                onArtistChange = bottomSheetViewModel::updateArtist,
-                onSave = bottomSheetViewModel::saveSong,
-                onAudioSelect = {
-                    if (permissionState.status.isGranted) { audioPickerLauncher.launch("audio/*") }
-                    else { permissionState.launchPermissionRequest() }
-                },
-                onCoverSelect = { imagePickerLauncher.launch("image/*") }
-            )
+            else -> {
+
+                AndroidView(
+                    factory = { context ->
+                        RecyclerView(context).apply {
+                            layoutManager = LinearLayoutManager(context)
+                            adapter = songAdapter
+                        }
+                    },
+
+                    update = { recyclerView ->
+                        songAdapter.updateSongs(libraryState.songs)
+                    },
+                    modifier = Modifier.weight(1f)
+                )
+            }
         }
     }
+
+
+    if (libraryState.isBottomSheetVisible) {
+        val bottomSheetViewModel: SongBottomSheetViewModel = hiltViewModel()
+        val bottomSheetState by bottomSheetViewModel.state.collectAsStateWithLifecycle()
+
+        //  contract
+        val audioPickerLauncher = rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.OpenDocument(),
+            onResult = { uri: Uri? ->
+                bottomSheetViewModel.setAudioFileUri(uri)
+            }
+        )
+
+
+        val imagePickerLauncher = rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.OpenDocument(),
+            onResult = { uri: Uri? ->
+                bottomSheetViewModel.setCoverImageUri(uri)
+            }
+        )
+
+        LaunchedEffect(Unit) { /*  permission request  */ }
+        LaunchedEffect(Unit) {
+            bottomSheetViewModel.eventFlow.collect { event ->
+                when (event) {
+                    is SheetEvent.SaveSuccess -> libraryViewModel.hideBottomSheet(refreshList = true)
+                    is SheetEvent.Dismiss -> libraryViewModel.hideBottomSheet(refreshList = true)
+                }
+            }
+        }
+
+        SongBottomSheet(
+            isVisible = true,
+            onDismiss = bottomSheetViewModel::dismiss,
+            title = bottomSheetState.title,
+            artist = bottomSheetState.artist,
+            audioFileName = bottomSheetState.audioFileName,
+            coverFileName = bottomSheetState.coverFileName,
+            durationMillis = bottomSheetState.durationMs,
+            isLoading = bottomSheetState.isLoading,
+            error = bottomSheetState.error,
+            onTitleChange = bottomSheetViewModel::updateTitle,
+            onArtistChange = bottomSheetViewModel::updateArtist,
+            onSave = bottomSheetViewModel::saveSong,
+            onAudioSelect = {
+                if (permissionState.status.isGranted) {
+                    audioPickerLauncher.launch(arrayOf("audio/*"))
+                } else {
+                    permissionState.launchPermissionRequest()
+                }
+            },
+            onCoverSelect = {
+                imagePickerLauncher.launch(arrayOf("image/*"))
+            }
+        )
+    }
+
 }
