@@ -19,6 +19,7 @@ import androidx.navigation.compose.rememberNavController
 import com.vibecoder.purrytify.presentation.features.auth.LoginScreen
 import com.vibecoder.purrytify.presentation.features.home.HomeScreen
 import com.vibecoder.purrytify.presentation.features.library.LibraryScreen
+import com.vibecoder.purrytify.presentation.features.profile.ProfileScreen
 import com.vibecoder.purrytify.presentation.features.splash.SplashViewModel
 import com.vibecoder.purrytify.presentation.theme.PurrytifyTheme
 import dagger.hilt.android.AndroidEntryPoint
@@ -31,6 +32,7 @@ object AppDestinations {
     const val LOGIN_ROUTE = "login"
     const val HOME_ROUTE = "home"
     const val LIBRARY_ROUTE = "library"
+    const val PROFILE_ROUTE = "profile"
 }
 
 @AndroidEntryPoint
@@ -86,5 +88,11 @@ fun AppNavigation(isAuthenticatedFlow: kotlinx.coroutines.flow.StateFlow<Boolean
                navController = navController,
            )
        }
+
+        composable(AppDestinations.PROFILE_ROUTE){
+            ProfileScreen(
+                navController = navController
+            )
+        }
     }
 }
