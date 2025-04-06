@@ -60,13 +60,15 @@ class SongBottomSheetViewModel @Inject constructor(
         if (uri == null) return
 
         try {
-            getApplication<Application>().contentResolver.takePersistableUriPermission(
-                uri,
-                Intent.FLAG_GRANT_READ_URI_PERMISSION
-            )
+
+            val contentResolver = getApplication<Application>().contentResolver
+            val takeFlags = Intent.FLAG_GRANT_READ_URI_PERMISSION
+            contentResolver.takePersistableUriPermission(uri, takeFlags)
+            Log.d("SongBottomSheetVM", "Successfully took persistable URI permission for audio: $uri")
         } catch (e: SecurityException) {
             Log.e("SongBottomSheetVM", "Failed to take persistable URI permission", e)
-            _state.update { it.copy(error = "Permission issue with audio file.") }
+            _state.update { it.copy(error = "Permission issue with audio file. Please try again.") }
+            return
         }
 
         _state.update { it.copy(selectedAudioUri = uri, isLoading = true, error = null) }
@@ -75,11 +77,12 @@ class SongBottomSheetViewModel @Inject constructor(
 
     fun setCoverImageUri(uri: Uri?) {
         if (uri == null) return
+
         try {
-            getApplication<Application>().contentResolver.takePersistableUriPermission(
-                uri,
-                Intent.FLAG_GRANT_READ_URI_PERMISSION
-            )
+            val contentResolver = getApplication<Application>().contentResolver
+            val takeFlags = Intent.FLAG_GRANT_READ_URI_PERMISSION
+            contentResolver.takePersistableUriPermission(uri, takeFlags)
+            Log.d("SongBottomSheetVM", "Successfully took persistable URI permission for cover: $uri")
         } catch (e: SecurityException) {
             Log.e("SongBottomSheetVM", "Failed to take persistable URI permission for cover", e)
         }
@@ -111,7 +114,6 @@ class SongBottomSheetViewModel @Inject constructor(
 
                 _state.update { currentState ->
                     currentState.copy(
-                        // Only update if metadata found and current field is empty
                         title = if (!title.isNullOrBlank() && currentState.title.isBlank()) title else currentState.title,
                         artist = if (!artist.isNullOrBlank() && currentState.artist.isBlank()) artist else currentState.artist,
                         durationMs = duration,
@@ -169,7 +171,7 @@ class SongBottomSheetViewModel @Inject constructor(
         if (currentState.durationMs == null || currentState.durationMs <= 0) {
             _state.update { it.copy(error = "Invalid or missing song duration.") }
             if(currentState.selectedAudioUri != null && currentState.durationMs == null) {
-                extractMetadata(currentState.selectedAudioUri) // Re-extract metadata to get duration
+                extractMetadata(currentState.selectedAudioUri)
             }
             return
         }
@@ -186,7 +188,7 @@ class SongBottomSheetViewModel @Inject constructor(
             isLiked = false
         )
 
-        // --- Call Repository ---
+
         viewModelScope.launch {
             when (val result = songRepository.addSong(newSong)) {
                 is Resource.Success -> {
@@ -197,7 +199,7 @@ class SongBottomSheetViewModel @Inject constructor(
                     _state.update { it.copy(isLoading = false, error = result.message) }
 
                 }
-                is Resource.Loading -> { /* Should not happen here unless repo has loading state */ }
+                is Resource.Loading -> {  }
             }
         }
     }

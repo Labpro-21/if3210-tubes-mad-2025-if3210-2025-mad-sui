@@ -1,14 +1,17 @@
 package com.vibecoder.purrytify.presentation.components
 
 
+import android.util.Log
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.vectorResource
 import androidx.navigation.NavController
+import androidx.navigation.compose.currentBackStackEntryAsState
 import com.vibecoder.purrytify.AppDestinations
 import com.vibecoder.purrytify.R
 
@@ -39,7 +42,9 @@ val bottomNavItems = listOf(
 )
 @Composable
 fun BottomNavigationBar(navController: NavController) {
-    val currentRoute = navController.currentBackStackEntry?.destination?.route
+    val currentBackStackEntry by navController.currentBackStackEntryAsState()
+    val currentRoute = currentBackStackEntry?.destination?.route
+    
 
     NavigationBar(
         containerColor = MaterialTheme.colorScheme.background,
@@ -58,6 +63,7 @@ fun BottomNavigationBar(navController: NavController) {
                     indicatorColor = Color.Transparent
                 ),
                 onClick = {
+                    Log.d("BottomNavigationBar", "Current route: $currentRoute, Item route: ${item.route}")
                     if (currentRoute != item.route) {
                         navController.navigate(item.route) {
                             popUpTo(navController.graph.startDestinationId) { saveState = true }
