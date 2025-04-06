@@ -34,72 +34,48 @@ import com.vibecoder.purrytify.presentation.features.home.SectionHeader
 
 @Composable
 fun ProfileScreen(
-    navController: NavController,
     viewModel: ProfileViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-
-    Scaffold(
-        bottomBar = {
-            Column {
-                state.currentSong?.let { song ->
-                    MinimizedMusicPlayer(
-                        title = song.title,
-                        artist = song.artist,
-                        coverUrl = song.coverArtUri ?: "",
-                        isPlaying = state.isPlaying,
-                        isFavorite = song.isLiked,
-                        onPlayPauseClick = viewModel::togglePlayPause,
-                        onFavoriteClick = viewModel::toggleFavorite,
-                        onPlayerClick = { }
-                    )
-                }
-                BottomNavigationBar(navController = navController)
-            }
-        }
-    ) { innerPadding ->
-        val screenHeightDp = LocalConfiguration.current.screenHeightDp.dp
-
+    val screenHeightDp = LocalConfiguration.current.screenHeightDp.dp
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+    ) {
+//            Half-screen gradient
         Box(
             modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-        ) {
-//            Half-screen gradient
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(screenHeightDp / 2)
-                    .background(
-                        brush = Brush.verticalGradient(
-                            colors = listOf(Color(0xFF00667B), Color(0xFF002F38), Color.Black)
-                        )
+                .fillMaxWidth()
+                .height(screenHeightDp / 2)
+                .background(
+                    brush = Brush.verticalGradient(
+                        colors = listOf(Color(0xFF00667B), Color(0xFF002F38), Color.Black)
                     )
-            )
+                )
+        )
 
-            when {
-                state.isLoading -> {
-                    CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
-                }
-                else -> {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(horizontal = 16.dp)
-                    ) {
-                        ProfileHeader(
-                            username = state.userProfile.username,
-                            location = state.userProfile.location,
-                            profileImageUrl = state.userProfile.profileImageUrl,
-                            onEditProfileClick = viewModel::navigateToEditProfile
-                        )
+        when {
+            state.isLoading -> {
+                CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+            }
+            else -> {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 16.dp)
+                ) {
+                    ProfileHeader(
+                        username = state.userProfile.username,
+                        location = state.userProfile.location,
+                        profileImageUrl = state.userProfile.profileImageUrl,
+                        onEditProfileClick = viewModel::navigateToEditProfile
+                    )
 
-                        ProfileStats(
-                            songCount = state.userStats.songCount,
-                            likedCount = state.userStats.likedCount,
-                            listenedCount = state.userStats.listenedCount
-                        )
-                    }
+                    ProfileStats(
+                        songCount = state.userStats.songCount,
+                        likedCount = state.userStats.likedCount,
+                        listenedCount = state.userStats.listenedCount
+                    )
                 }
             }
         }

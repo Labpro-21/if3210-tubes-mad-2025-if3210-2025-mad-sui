@@ -14,7 +14,6 @@ import com.vibecoder.purrytify.data.repository.AuthRepository
 
 @HiltViewModel
 class ProfileViewModel @Inject constructor(
-    private val songRepository: SongRepository,
     private val authRepository: AuthRepository
 ) : ViewModel() {
 
@@ -31,7 +30,6 @@ class ProfileViewModel @Inject constructor(
     private fun loadUserProfile() {
         viewModelScope.launch {
             _state.update { it.copy(isLoading = true, error = null) }
-
             when (val result = authRepository.getProfile()) {
                 is Resource.Success -> {
                     result.data?.let { userDto ->
@@ -117,47 +115,6 @@ class ProfileViewModel @Inject constructor(
             } catch (e: Exception) {
                 Log.e("ProfileViewModel", "Error loading user stats", e)
             }
-        }
-    }
-    private fun updateLikedCountInStats(likedCount: Int) {
-        _state.update {
-            it.copy(
-                userStats = it.userStats.copy(
-                    likedCount = likedCount
-                )
-            )
-        }
-    }
-
-    fun togglePlayPause() {
-        if (_state.value.currentSong != null) {
-            val currentlyPlaying = !_state.value.isPlaying
-            _state.update { it.copy(isPlaying = currentlyPlaying) }
-            // TODO: Integrate with PlaybackStateManager later
-        }
-    }
-
-    fun toggleFavorite() {
-        viewModelScope.launch {
-            _state.value.currentSong?.let { song ->
-                val newLikedStatus = !song.isLiked
-
-                when (val result = songRepository.updateLikeStatus(song.id, newLikedStatus)) {
-                    is Resource.Success -> {
-                        _state.update { currentState ->
-                            currentState.copy(
-                                currentSong = currentState.currentSong?.copy(isLiked = newLikedStatus),
-                            )
-                        }
-                        // TODO : add update to the liked songs counter
-                        Log.d("ProfileViewModel", "Like status updated for ${song.id}")
-                    }
-                    is Resource.Error -> {
-                        Log.e("ProfileViewModel", "Failed to update like status for ${song.id}: ${result.message}")
-                    }
-                    else -> {}
-                }
-            } ?: Log.w("ProfileViewModel", "Toggle Favorite called but no song is playing.")
         }
     }
     fun navigateToEditProfile() {

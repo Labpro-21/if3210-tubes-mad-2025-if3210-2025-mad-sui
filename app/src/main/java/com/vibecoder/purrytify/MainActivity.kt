@@ -39,8 +39,8 @@ object AppDestinations {
 // login has no bottom bar
 val mainScaffoldRoutes = setOf(
     AppDestinations.HOME_ROUTE,
-    AppDestinations.LIBRARY_ROUTE
-    // AppDestinations.PROFILE_ROUTE
+    AppDestinations.LIBRARY_ROUTE,
+    AppDestinations.PROFILE_ROUTE
 )
 
 @AndroidEntryPoint
@@ -185,9 +185,7 @@ fun AppNavHost(
             LibraryScreen()
         }
         composable(AppDestinations.PROFILE_ROUTE){
-            ProfileScreen(
-                navController = navController
-            )
+            ProfileScreen()
         }
     }
 }
