@@ -28,8 +28,8 @@ sealed class NavigationItem(val route: String, val labelResId: Int, val iconResI
         R.drawable.ic_library
     )
     object Profile : NavigationItem(
-        "profile",
-//        AppDestinations.PROFILE_ROUTE,
+//        "profile",
+        AppDestinations.PROFILE_ROUTE,
         R.string.nav_profile,
         R.drawable.ic_profile
     )

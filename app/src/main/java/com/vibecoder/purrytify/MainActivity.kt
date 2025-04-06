@@ -19,6 +19,7 @@ import com.vibecoder.purrytify.presentation.components.BottomNavigationBar
 import com.vibecoder.purrytify.presentation.features.auth.LoginScreen
 import com.vibecoder.purrytify.presentation.features.home.HomeScreen
 import com.vibecoder.purrytify.presentation.features.library.LibraryScreen
+import com.vibecoder.purrytify.presentation.features.profile.ProfileScreen
 import com.vibecoder.purrytify.presentation.features.player.FullScreenPlayerScreen
 import com.vibecoder.purrytify.presentation.features.player.PlayerViewModel
 import com.vibecoder.purrytify.presentation.features.shared.SharedMinimizedMusicPlayer
@@ -31,14 +32,15 @@ object AppDestinations {
     const val LOGIN_ROUTE = "login"
     const val HOME_ROUTE = "home"
     const val LIBRARY_ROUTE = "library"
+    const val PROFILE_ROUTE = "profile"
 
 }
 
 // login has no bottom bar
 val mainScaffoldRoutes = setOf(
     AppDestinations.HOME_ROUTE,
-    AppDestinations.LIBRARY_ROUTE
-    // AppDestinations.PROFILE_ROUTE
+    AppDestinations.LIBRARY_ROUTE,
+    AppDestinations.PROFILE_ROUTE
 )
 
 @AndroidEntryPoint
@@ -175,11 +177,15 @@ fun AppNavHost(
                 }
             )
         }
+
         composable(AppDestinations.HOME_ROUTE) {
             HomeScreen()
         }
         composable(AppDestinations.LIBRARY_ROUTE) {
             LibraryScreen()
+        }
+        composable(AppDestinations.PROFILE_ROUTE){
+            ProfileScreen()
         }
     }
 }
