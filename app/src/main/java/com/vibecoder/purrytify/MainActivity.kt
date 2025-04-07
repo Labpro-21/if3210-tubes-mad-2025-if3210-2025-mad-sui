@@ -17,6 +17,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.*
 import com.vibecoder.purrytify.presentation.components.BottomNavigationBar
+import com.vibecoder.purrytify.presentation.components.NetworkAwareApp
 import com.vibecoder.purrytify.presentation.features.auth.LoginScreen
 import com.vibecoder.purrytify.presentation.features.home.HomeScreen
 import com.vibecoder.purrytify.presentation.features.library.LibraryScreen
@@ -60,7 +61,9 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             PurrytifyTheme {
-                PurritifyApp(splashViewModel = splashViewModel)
+                NetworkAwareApp {
+                    PurritifyApp(splashViewModel = splashViewModel)
+                }
             }
         }
     }
