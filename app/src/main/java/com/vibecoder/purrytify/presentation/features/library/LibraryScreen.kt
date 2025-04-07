@@ -176,7 +176,7 @@ fun LibraryScreen(
                         }
                     },
 
-                    update = { recyclerView ->
+                    update = { _ ->
                         songAdapter.updateSongs(libraryState.songs)
                     },
                     modifier = Modifier.weight(1f)

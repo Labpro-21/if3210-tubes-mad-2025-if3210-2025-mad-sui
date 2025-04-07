@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -33,7 +34,7 @@ object AppDestinations {
     const val HOME_ROUTE = "home"
     const val LIBRARY_ROUTE = "library"
     const val PROFILE_ROUTE = "profile"
-
+    const val PLAYER_ROUTE = "player"
 }
 
 // login has no bottom bar
@@ -65,7 +66,6 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PurritifyApp(splashViewModel: SplashViewModel) {
@@ -85,10 +85,12 @@ fun PurritifyApp(splashViewModel: SplashViewModel) {
         }
     }
 
-
     var showPlayerSheet by remember { mutableStateOf(false) }
     val playerSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = rememberCoroutineScope()
+
+    val currentSong by playerViewModel.currentSong.collectAsStateWithLifecycle()
+    val shouldShowMiniPlayer = currentSong != null
 
     // Observe the playerViewModel's UI events
     LaunchedEffect(playerViewModel, playerSheetState) {
@@ -97,7 +99,6 @@ fun PurritifyApp(splashViewModel: SplashViewModel) {
                 is PlayerViewModel.UiEvent.NavigateToFullScreenPlayer -> {
                     if (!playerSheetState.isVisible) {
                         showPlayerSheet = true
-
                     }
                 }
                 is PlayerViewModel.UiEvent.ShowSnackbar -> {
@@ -110,26 +111,24 @@ fun PurritifyApp(splashViewModel: SplashViewModel) {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
 
-
     val showMainScaffoldBottomBar = currentRoute in mainScaffoldRoutes
 
     Scaffold(
         bottomBar = {
             if (showMainScaffoldBottomBar) {
                 Column {
-                    SharedMinimizedMusicPlayer(
-
-                        onPlayerAreaClick = {
-                            playerViewModel.onPlayerClicked()
-                        }
-                    )
+                    if (shouldShowMiniPlayer) {
+                        SharedMinimizedMusicPlayer(
+                            onPlayerAreaClick = {
+                                playerViewModel.onPlayerClicked()
+                            }
+                        )
+                    }
                     BottomNavigationBar(navController = navController)
                 }
             }
-
         }
     ) { innerPadding ->
-
         AppNavHost(
             navController = navController,
             startDestination = startDestination,
@@ -137,11 +136,12 @@ fun PurritifyApp(splashViewModel: SplashViewModel) {
         )
     }
 
-
     if (showPlayerSheet) {
         ModalBottomSheet(
             onDismissRequest = { showPlayerSheet = false },
             sheetState = playerSheetState,
+            dragHandle = null,
+            shape = RectangleShape,
         ) {
             FullScreenPlayerScreen(
                 playerViewModel = playerViewModel,
@@ -149,12 +149,12 @@ fun PurritifyApp(splashViewModel: SplashViewModel) {
                     scope.launch {
                         playerSheetState.hide()
                     }.invokeOnCompletion { if (!playerSheetState.isVisible) showPlayerSheet = false }
-                }
+                },
+                navController = navController
             )
         }
     }
 }
-
 
 @Composable
 fun AppNavHost(
@@ -181,11 +181,24 @@ fun AppNavHost(
         composable(AppDestinations.HOME_ROUTE) {
             HomeScreen()
         }
+
         composable(AppDestinations.LIBRARY_ROUTE) {
             LibraryScreen()
         }
-        composable(AppDestinations.PROFILE_ROUTE){
+
+        composable(AppDestinations.PROFILE_ROUTE) {
             ProfileScreen()
+        }
+
+        composable(AppDestinations.PLAYER_ROUTE) {
+            val playerViewModel: PlayerViewModel = hiltViewModel()
+            FullScreenPlayerScreen(
+                playerViewModel = playerViewModel,
+                onCollapse = {
+                    navController.navigateUp()
+                },
+                navController = navController
+            )
         }
     }
 }

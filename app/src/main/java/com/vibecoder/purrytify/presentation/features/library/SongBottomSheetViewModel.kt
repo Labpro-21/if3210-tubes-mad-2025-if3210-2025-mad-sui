@@ -95,9 +95,9 @@ class SongBottomSheetViewModel @Inject constructor(
 
     private fun extractMetadata(uri: Uri) {
         viewModelScope.launch {
-            var title: String? = null
-            var artist: String? = null
-            var duration: Long? = null
+            var title: String?
+            var artist: String?
+            var duration: Long?
             val fileName = getFileName(uri)
 
             try {
@@ -170,7 +170,7 @@ class SongBottomSheetViewModel @Inject constructor(
         }
         if (currentState.durationMs == null || currentState.durationMs <= 0) {
             _state.update { it.copy(error = "Invalid or missing song duration.") }
-            if(currentState.selectedAudioUri != null && currentState.durationMs == null) {
+            if (currentState.durationMs == null) {
                 extractMetadata(currentState.selectedAudioUri)
             }
             return
