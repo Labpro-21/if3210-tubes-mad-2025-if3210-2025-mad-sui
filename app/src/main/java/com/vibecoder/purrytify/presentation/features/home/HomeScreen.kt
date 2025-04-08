@@ -11,57 +11,59 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.navigation.NavController
 import com.vibecoder.purrytify.presentation.components.MusicCard
-import com.vibecoder.purrytify.presentation.components.BottomNavigationBar
 import com.vibecoder.purrytify.presentation.components.SmallMusicCard
-import com.vibecoder.purrytify.presentation.components.MinimizedMusicPlayer
 
 @Composable
-fun HomeScreen(
-    viewModel: HomeViewModel = hiltViewModel()
-) {
+fun HomeScreen(viewModel: HomeViewModel = hiltViewModel()) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val currentSong by viewModel.currentSong.collectAsStateWithLifecycle()
+    val isPlaying by viewModel.isPlaying.collectAsStateWithLifecycle()
 
     Box(modifier = Modifier.fillMaxSize()) {
         when {
             state.isLoading -> {
                 CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
             }
-
             state.error != null -> {
                 Text(
-                    "Error: ${state.error}",
-                    color = MaterialTheme.colorScheme.error,
-                    modifier = Modifier
-                        .align(Alignment.Center)
-                        .padding(16.dp)
+                        "Error: ${state.error}",
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.align(Alignment.Center).padding(16.dp)
                 )
             }
-
             else -> {
-
                 LazyColumn(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(horizontal = 16.dp),
-                    contentPadding = PaddingValues(vertical = 16.dp),
-                    verticalArrangement = Arrangement.spacedBy(24.dp)
+                        modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
+                        contentPadding = PaddingValues(vertical = 16.dp),
+                        verticalArrangement = Arrangement.spacedBy(24.dp)
                 ) {
                     // New Songs
                     if (state.newSongs.isNotEmpty()) {
                         item {
                             SectionHeader(title = "New Songs")
                             LazyRow(
-                                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                contentPadding = PaddingValues(horizontal = 4.dp)
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                    contentPadding = PaddingValues(horizontal = 4.dp)
                             ) {
                                 items(state.newSongs, key = { it.id }) { song ->
+                                    val isCurrentSong = currentSong?.id == song.id
+                                    val isSongPlaying = isCurrentSong && isPlaying
+
                                     MusicCard(
-                                        title = song.title,
-                                        artist = song.artist,
-                                        coverUrl = song.coverArtUri ?: "",
-                                        onClick = { viewModel.selectSong(song) }
+                                            title = song.title,
+                                            artist = song.artist,
+                                            coverUrl = song.coverArtUri ?: "",
+                                            isCurrentSong = isCurrentSong,
+                                            isPlaying = isSongPlaying,
+                                            onClick = { viewModel.selectSong(song) },
+                                            onPlayPauseClick = {
+                                                if (isCurrentSong) {
+                                                    viewModel.togglePlayPause()
+                                                } else {
+                                                    viewModel.selectSong(song)
+                                                }
+                                            }
                                     )
                                 }
                             }
@@ -72,30 +74,44 @@ fun HomeScreen(
                     if (state.recentlyPlayed.isNotEmpty()) {
                         item {
                             SectionHeader(title = "Recently Played")
-                            Column(
-                                verticalArrangement = Arrangement.spacedBy(4.dp)
-                            ) {
-
+                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                 state.recentlyPlayed.take(5).forEach { song ->
+                                    val isCurrentSong = currentSong?.id == song.id
+                                    val isSongPlaying = isCurrentSong && isPlaying
+
                                     SmallMusicCard(
-                                        title = song.title,
-                                        artist = song.artist,
-                                        coverUrl = song.coverArtUri ?: "",
-                                        onClick = { viewModel.selectSong(song) }
+                                            title = song.title,
+                                            artist = song.artist,
+                                            coverUrl = song.coverArtUri ?: "",
+                                            isCurrentSong = isCurrentSong,
+                                            isPlaying = isSongPlaying,
+                                            onClick = { viewModel.selectSong(song) },
+                                            onPlayPauseClick = {
+                                                if (isCurrentSong) {
+                                                    viewModel.togglePlayPause()
+                                                } else {
+                                                    viewModel.selectSong(song)
+                                                }
+                                            }
                                     )
                                     HorizontalDivider(
-                                        thickness = 0.5.dp,
-                                        color = MaterialTheme.colorScheme.surfaceVariant
+                                            thickness = 0.5.dp,
+                                            color =
+                                                    MaterialTheme.colorScheme.surfaceVariant.copy(
+                                                            alpha = 0.5f
+                                                    ),
+                                            modifier = Modifier.padding(start = 64.dp)
                                     )
                                 }
                             }
                         }
                     } else if (!state.isLoading) {
                         item {
+                            SectionHeader(title = "Recently Played")
                             Text(
-                                "No recently played songs.",
-                                modifier = Modifier.padding(vertical = 8.dp),
-                                color = MaterialTheme.colorScheme.secondary
+                                    "No recently played songs.",
+                                    modifier = Modifier.padding(vertical = 8.dp),
+                                    color = MaterialTheme.colorScheme.secondary
                             )
                         }
                     }
@@ -105,20 +121,17 @@ fun HomeScreen(
     }
 }
 
-
 @Composable
 fun SectionHeader(title: String) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 8.dp),
-        horizontalArrangement = Arrangement.Start,
-        verticalAlignment = Alignment.CenterVertically
+            modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+            horizontalArrangement = Arrangement.Start,
+            verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
-            text = title,
-            style = MaterialTheme.typography.displaySmall,
-            color = MaterialTheme.colorScheme.onBackground
+                text = title,
+                style = MaterialTheme.typography.displaySmall,
+                color = MaterialTheme.colorScheme.onBackground
         )
     }
 }
