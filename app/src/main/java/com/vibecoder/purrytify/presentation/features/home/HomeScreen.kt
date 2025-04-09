@@ -23,15 +23,13 @@ fun HomeScreen(
         playerViewModel: PlayerViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    val currentSong by viewModel.currentSong.collectAsStateWithLifecycle()
-    val isPlaying by viewModel.isPlaying.collectAsStateWithLifecycle()
+    val currentSong by playerViewModel.currentSong.collectAsStateWithLifecycle()
+    val isPlaying by playerViewModel.isPlaying.collectAsStateWithLifecycle()
 
     // State for the context menu
     var selectedSong by remember { mutableStateOf<SongEntity?>(null) }
     var showContextMenu by remember { mutableStateOf(false) }
     var selectedSongStatus by remember { mutableStateOf(PlayerViewModel.SongStatus.NOT_IN_QUEUE) }
-
-    val queueSongs by playerViewModel.queueSongs.collectAsStateWithLifecycle()
 
     Box(modifier = Modifier.fillMaxSize()) {
         when {
@@ -70,11 +68,17 @@ fun HomeScreen(
                                             isCurrentSong = isCurrentSong,
                                             isPlaying = isSongPlaying,
                                             onClick = { viewModel.selectSong(song) },
-                                            onPlayPauseClick = {},
+                                            onPlayPauseClick = {
+                                                if (isCurrentSong) {
+                                                    playerViewModel.togglePlayPause()
+                                                } else {
+                                                    viewModel.selectSong(song)
+                                                }
+                                            },
                                             onMoreOptionsClick = {
                                                 selectedSong = song
                                                 selectedSongStatus =
-                                                        PlayerViewModel.SongStatus.CURRENTLY_PLAYING
+                                                        playerViewModel.checkSongStatus(song)
                                                 showContextMenu = true
                                             }
                                     )
@@ -101,7 +105,7 @@ fun HomeScreen(
                                             onClick = { viewModel.selectSong(song) },
                                             onPlayPauseClick = {
                                                 if (isCurrentSong) {
-                                                    viewModel.togglePlayPause()
+                                                    playerViewModel.togglePlayPause()
                                                 } else {
                                                     viewModel.selectSong(song)
                                                 }
@@ -109,7 +113,7 @@ fun HomeScreen(
                                             onMoreOptionsClick = {
                                                 selectedSong = song
                                                 selectedSongStatus =
-                                                        PlayerViewModel.SongStatus.CURRENTLY_PLAYING
+                                                        playerViewModel.checkSongStatus(song)
                                                 showContextMenu = true
                                             }
                                     )
@@ -146,15 +150,18 @@ fun HomeScreen(
                 isOpen = showContextMenu,
                 onDismiss = { showContextMenu = false },
                 songStatus = selectedSongStatus,
-                onPlayPauseClick = {},
-                onToggleQueueClick = {},
-                onToggleFavorite = {},
-                onDelete = {
-                    // TODO: Implement this
+                isPlaying = isPlaying && song.id == currentSong?.id,
+                onPlayPauseClick = {
+                    if (song.id == currentSong?.id) {
+                        playerViewModel.togglePlayPause()
+                    } else {
+                        viewModel.selectSong(song)
+                    }
                 },
-                onEdit = {
-                    // TODO: Implement this
-                }
+                onToggleQueueClick = { playerViewModel.toggleQueueStatus(song) },
+                onToggleFavorite = { viewModel.toggleLikeStatus(song) },
+                onDelete = { viewModel.deleteSong(song) },
+                onEdit = { viewModel.showEditSongDialog(song) }
         )
     }
 }

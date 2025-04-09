@@ -16,7 +16,9 @@ data class HomeScreenState(
         val recentlyPlayed: List<SongEntity> = emptyList(),
         val newSongs: List<SongEntity> = emptyList(),
         val isLoading: Boolean = true,
-        val error: String? = null
+        val error: String? = null,
+        val showEditDialog: Boolean = false,
+        val songToEdit: SongEntity? = null
 )
 
 @HiltViewModel
@@ -78,32 +80,54 @@ constructor(
         }
     }
 
-    fun addToQueue(song: SongEntity) {
-        playbackStateManager.addToQueue(song)
-    }
-
-    fun toggleFavorite() {
+    fun toggleLikeStatus(song: SongEntity) {
         viewModelScope.launch {
-            val songToToggle = playbackStateManager.currentSong.value
-            if (songToToggle != null) {
-                val newLikedStatus = !songToToggle.isLiked
-                when (val result = songRepository.updateLikeStatus(songToToggle.id, newLikedStatus)
-                ) {
-                    is Resource.Success -> {
+            val newLikedStatus = !song.isLiked
+            when (val result = songRepository.updateLikeStatus(song.id, newLikedStatus)) {
+                is Resource.Success -> {
+                    if (song.id == currentSong.value?.id) {
                         playbackStateManager.refreshCurrentSongData()
-                        Log.d("HomeViewModel", "Song favorite status updated successfully.")
                     }
-                    is Resource.Error -> {
-                        Log.e(
-                                "HomeViewModel",
-                                "Error updating song favorite status: ${result.message}"
-                        )
-                    }
-                    is Resource.Loading -> {
-                        Log.d("HomeViewModel", "Updating song favorite status...")
-                    }
+                    loadHomepageSongs()
+                    Log.d("HomeViewModel", "Song like status updated successfully.")
+                }
+                is Resource.Error -> {
+                    Log.e("HomeViewModel", "Error updating song like status: ${result.message}")
+                }
+                is Resource.Loading -> {
+                    Log.d("HomeViewModel", "Updating song like status...")
                 }
             }
         }
+    }
+
+    fun deleteSong(song: SongEntity) {
+        viewModelScope.launch {
+            when (val result = songRepository.deleteSong(song.id)) {
+                is Resource.Success -> {
+                    // Refresh song lists
+                    loadHomepageSongs()
+                    Log.d("HomeViewModel", "Song deleted successfully.")
+                }
+                is Resource.Error -> {
+                    Log.e("HomeViewModel", "Error deleting song: ${result.message}")
+                }
+                is Resource.Loading -> {
+                    Log.d("HomeViewModel", "Deleting song...")
+                }
+            }
+        }
+    }
+
+    fun showEditSongDialog(song: SongEntity) {
+        _state.update { it.copy(showEditDialog = true, songToEdit = song) }
+    }
+
+    fun hideEditSongDialog() {
+        _state.update { it.copy(showEditDialog = false, songToEdit = null) }
+    }
+
+    fun refreshSongs() {
+        loadHomepageSongs()
     }
 }

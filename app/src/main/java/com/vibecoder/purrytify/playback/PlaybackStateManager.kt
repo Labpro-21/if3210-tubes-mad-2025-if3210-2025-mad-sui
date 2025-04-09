@@ -19,7 +19,6 @@ import com.vibecoder.purrytify.util.Resource
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlin.random.Random
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 
@@ -46,12 +45,23 @@ constructor(
     private val _isConnecting = MutableStateFlow(false)
     private val _error = MutableStateFlow<String?>(null)
 
+    //   Bonus State
     private val _queue = MutableStateFlow<List<QueueItem>>(emptyList())
-    private val _originalQueue = MutableStateFlow<List<QueueItem>>(emptyList())
     private val _repeatMode = MutableStateFlow(RepeatMode.NONE)
     private val _shuffleMode = MutableStateFlow(ShuffleMode.OFF)
 
-    // Recently played songs tracking
+    // Navigation state
+    private val _canSkipNext = MutableStateFlow(false)
+    private val _canSkipPrevious = MutableStateFlow(false)
+
+    // Current index in queue
+    private val _currentQueueIndex = MutableStateFlow(-1)
+    private val _isPlayingFromQueue = MutableStateFlow(false)
+
+    // Regular songs list case empty queue
+    private val _playbackList = MutableStateFlow<List<SongEntity>>(emptyList())
+    private var currentPlaybackIndex = -1
+
     private val _recentlyPlayed = MutableStateFlow<List<SongEntity>>(emptyList())
 
     val currentSong: StateFlow<SongEntity?> = _currentSong.asStateFlow()
@@ -65,16 +75,48 @@ constructor(
     val repeatMode: StateFlow<RepeatMode> = _repeatMode.asStateFlow()
     val shuffleMode: StateFlow<ShuffleMode> = _shuffleMode.asStateFlow()
     val recentlyPlayed: StateFlow<List<SongEntity>> = _recentlyPlayed.asStateFlow()
+    val canSkipNext: StateFlow<Boolean> = _canSkipNext.asStateFlow()
+    val canSkipPrevious: StateFlow<Boolean> = _canSkipPrevious.asStateFlow()
+    val currentQueueIndex: StateFlow<Int> = _currentQueueIndex.asStateFlow()
+    val isPlayingFromQueue: StateFlow<Boolean> = _isPlayingFromQueue.asStateFlow()
 
-    // Current song index in queue
-    private var currentQueueIndex = -1
+    private var handlingPlaybackEnd = false
     private var positionUpdateJob: Job? = null
 
     init {
         initializeMediaController()
         loadRecentlyPlayed()
+        updateNavigationState()
     }
 
+    // Prev and next update state button
+    private fun updateNavigationState() {
+        // Using queue
+        if (_queue.value.isNotEmpty()) {
+            val currentIndex = _currentQueueIndex.value
+
+            val hasNext =
+                    currentIndex < _queue.value.size - 1 || _repeatMode.value == RepeatMode.ALL
+
+            val hasPrevious = currentIndex > 0 || _repeatMode.value == RepeatMode.ALL
+
+            _canSkipNext.value = hasNext
+            _canSkipPrevious.value = hasPrevious
+        }
+        // Using regular playback list
+        else {
+            val hasNext =
+                    currentPlaybackIndex < _playbackList.value.size - 1 ||
+                            _repeatMode.value == RepeatMode.ALL
+
+            val hasPrevious = currentPlaybackIndex > 0 || _repeatMode.value == RepeatMode.ALL
+
+            _canSkipNext.value = hasNext
+            _canSkipPrevious.value = hasPrevious
+        }
+    }
+
+    // Load recently played songs from SharedPreferences
     private fun loadRecentlyPlayed() {
         mainScope.launch {
             try {
@@ -224,12 +266,20 @@ constructor(
                             resource.data?.let { song ->
                                 _currentSong.value = song
                                 addToRecentlyPlayed(song)
+
+                                // Update queue index if playing from queue
+                                if (_isPlayingFromQueue.value) {
+                                    for (i in _queue.value.indices) {
+                                        if (_queue.value[i].songId == song.id) {
+                                            _currentQueueIndex.value = i
+                                            break
+                                        }
+                                    }
+                                }
                             }
-                            if (resource.data == null)
-                                    Log.w(
-                                            TAG,
-                                            "Song with ID $currentSongId not found in repository."
-                                    )
+                            if (resource.data == null) {
+                                Log.w(TAG, "Song with ID $currentSongId not found in repository.")
+                            }
                         }
                         is Resource.Error -> {
                             Log.e(
@@ -241,6 +291,8 @@ constructor(
                         }
                         else -> {}
                     }
+
+                    updateNavigationState()
                 }
             } else {
                 _currentSong.value = null
@@ -254,6 +306,10 @@ constructor(
         _playbackState.value = Player.STATE_IDLE
         _currentPositionMs.value = 0L
         _totalDurationMs.value = 0L
+        _currentQueueIndex.value = -1
+        _isPlayingFromQueue.value = false
+        _canSkipNext.value = false
+        _canSkipPrevious.value = false
     }
 
     private val playerListener =
@@ -266,16 +322,6 @@ constructor(
                         stopPositionUpdates()
                         _currentPositionMs.value =
                                 mediaController?.currentPosition?.coerceAtLeast(0L) ?: 0L
-
-                        val isAtEnd = _currentPositionMs.value >= _totalDurationMs.value * 0.98
-                        // precision issues
-                        if (isAtEnd && _playbackState.value != Player.STATE_ENDED) {
-                            Log.d(
-                                    TAG,
-                                    "Detected end of track through position (${_currentPositionMs.value}/${_totalDurationMs.value})"
-                            )
-                            handlePlaybackEnd()
-                        }
                     }
                 }
 
@@ -290,12 +336,20 @@ constructor(
                             _isPlaying.value = false
                             _currentPositionMs.value = _totalDurationMs.value
 
-                            handlePlaybackEnd()
+                            // This fucking problem to solve the undeterministic behaviour of double
+                            // jump
+                            if (!handlingPlaybackEnd) {
+                                handlePlaybackEnd()
+                            }
                         }
                         Player.STATE_READY -> {
                             _totalDurationMs.value =
                                     mediaController?.duration?.coerceAtLeast(0L) ?: 0L
                             if (mediaController?.isPlaying == true) startPositionUpdates()
+
+                            handlingPlaybackEnd = false
+
+                            updateNavigationState()
                         }
                         Player.STATE_IDLE -> {
                             resetState()
@@ -310,7 +364,9 @@ constructor(
                     _totalDurationMs.value = mediaController?.duration?.coerceAtLeast(0L) ?: 0L
 
                     mediaItem?.mediaId?.toLongOrNull()?.let { songId ->
-                        updateCurrentQueueIndex(songId)
+                        if (!_isPlayingFromQueue.value) {
+                            updateCurrentPlaybackIndex(songId)
+                        }
                     }
                 }
 
@@ -401,6 +457,7 @@ constructor(
         return _recentlyPlayed.value
     }
 
+    // Play a single song (not from queue)
     fun playSong(song: SongEntity, songsList: List<SongEntity> = emptyList()) {
         if (mediaController == null) {
             Log.w(TAG, "playSong called but mediaController is null. Attempting to initialize.")
@@ -412,46 +469,57 @@ constructor(
 
         mainScope.launch {
             if (songsList.isNotEmpty()) {
-                createNewQueue(songsList, song.id)
-            } else {
-                playMediaItem(song)
-                if (_queue.value.isEmpty()) {
-                    _queue.value = listOf(QueueItem(song.id, 0))
-                    _originalQueue.value = _queue.value
-                    currentQueueIndex = 0
+                _playbackList.value = songsList
+
+                val index = songsList.indexOfFirst { it.id == song.id }
+                if (index >= 0) {
+                    currentPlaybackIndex = index
                 }
             }
+
+            _isPlayingFromQueue.value = false
+
+            playMediaItem(song)
+
+            updateNavigationState()
         }
     }
 
+    // Add song to manual queue
     fun addToQueue(song: SongEntity) {
         mainScope.launch {
-            if (_queue.value.isEmpty()) {
-                playSong(song)
+            // Duplicate check
+            if (_queue.value.any { it.songId == song.id }) {
+                Log.d(TAG, "Song ${song.title} is already in queue")
                 return@launch
             }
 
-            val newItem = QueueItem(song.id, _originalQueue.value.size)
-            _originalQueue.update { it + newItem }
+            val newItem = QueueItem(song.id, _queue.value.size)
 
-            if (_shuffleMode.value == ShuffleMode.ON) {
-                val currentIndex = currentQueueIndex
-                if (currentIndex >= 0 && currentIndex < _queue.value.size - 1) {
-                    val insertIndex = Random.nextInt(currentIndex + 1, _queue.value.size + 1)
-                    val newQueue = _queue.value.toMutableList()
-                    newQueue.add(insertIndex, newItem)
-                    _queue.value = newQueue
-                } else {
-                    _queue.update { it + newItem }
-                }
-            } else {
-                _queue.update { it + newItem }
-            }
+            _queue.update { it + newItem }
 
-            Log.d(TAG, "Added song ${song.title} to queue, position: ${_queue.value.size}")
+            Log.d(TAG, "Added song ${song.title} to queue, queue size: ${_queue.value.size}")
+
+            updateNavigationState()
         }
     }
 
+    // Remove song from manual queue
+    fun removeFromQueue(songId: Long) {
+        mainScope.launch {
+            if (!_queue.value.any { it.songId == songId }) {
+                Log.d(TAG, "Song ID $songId not found in queue")
+                return@launch
+            }
+
+            _queue.update { it.filterNot { item -> item.songId == songId } }
+            Log.d(TAG, "Removed song ID $songId from queue, new size: ${_queue.value.size}")
+
+            updateNavigationState()
+        }
+    }
+
+    // Get songs in queue for display
     fun getQueueSongs(callback: (List<SongEntity>) -> Unit) {
         mainScope.launch {
             val songsList = mutableListOf<SongEntity>()
@@ -467,92 +535,60 @@ constructor(
         }
     }
 
-    private fun createNewQueue(songs: List<SongEntity>, startSongId: Long) {
-        if (songs.isEmpty()) return
+    // Check if a song is in the queue
+    fun isInQueue(songId: Long): Boolean {
+        return _queue.value.any { it.songId == songId }
+    }
 
-        val queueItems = songs.mapIndexed { index, song -> QueueItem(song.id, index) }
-
-        _originalQueue.value = queueItems
-
-        if (_shuffleMode.value == ShuffleMode.ON) {
-            applyShuffleToQueue(startSongId)
-        } else {
-            _queue.value = queueItems
+    // Play a song from the queue at a specific index
+    fun playQueueItem(index: Int) {
+        if (index < 0 || index >= _queue.value.size) {
+            Log.e(TAG, "Invalid queue index: $index (queue size: ${_queue.value.size})")
+            return
         }
 
-        val startIndex =
-                _queue.value.indexOfFirst { it.songId == startSongId }.takeIf { it >= 0 } ?: 0
-        currentQueueIndex = startIndex
+        val queueItem = _queue.value[index]
+        Log.d(TAG, "Playing queue item at index $index (song ID: ${queueItem.songId})")
 
         mainScope.launch {
-            val songToPlay = songRepository.getSongById(startSongId)
-            if (songToPlay is Resource.Success && songToPlay.data != null) {
-                playMediaItem(songToPlay.data)
+            val songResult = songRepository.getSongById(queueItem.songId)
+            if (songResult is Resource.Success && songResult.data != null) {
+                _isPlayingFromQueue.value = true
+                _currentQueueIndex.value = index
+
+                val song = songResult.data
+                playMediaItem(song)
+
+                Log.d(TAG, "Successfully loaded and playing song from queue: ${song.title}")
+
+                updateNavigationState()
             } else {
-                _error.value = "Failed to load the selected song."
+                Log.e(TAG, "Failed to load song from queue index $index")
+                _error.value = "Failed to load song from queue."
             }
         }
     }
 
-    private fun updateCurrentQueueIndex(songId: Long) {
-        currentQueueIndex = _queue.value.indexOfFirst { it.songId == songId }
-    }
-
-    private fun applyShuffleToQueue(keepSongId: Long = -1L) {
-        val currentItems = _originalQueue.value
-        if (currentItems.isEmpty()) return
-
-        val songToKeep =
-                if (keepSongId > 0) {
-                    currentItems.find { it.songId == keepSongId }
-                } else null
-
-        val itemsToShuffle = currentItems.toMutableList()
-        if (songToKeep != null) {
-            itemsToShuffle.removeIf { it.songId == keepSongId }
+    private fun updateCurrentPlaybackIndex(songId: Long) {
+        val newIndex = _playbackList.value.indexOfFirst { it.id == songId }
+        if (newIndex >= 0) {
+            currentPlaybackIndex = newIndex
+            Log.d(
+                    TAG,
+                    "Updated current playback index to $currentPlaybackIndex for song ID $songId"
+            )
         }
-
-        // Fisher-Yates shuffle algorithm
-        val shuffledItems = itemsToShuffle.toMutableList()
-        for (i in shuffledItems.size - 1 downTo 1) {
-            val j = Random.nextInt(i + 1)
-            val temp = shuffledItems[j]
-            shuffledItems[j] = shuffledItems[i]
-            shuffledItems[i] = temp
-        }
-
-        val newQueue =
-                if (songToKeep != null) {
-                    listOf(songToKeep) + shuffledItems
-                } else {
-                    shuffledItems
-                }
-
-        _queue.value = newQueue
-        Log.d(TAG, "Queue shuffled, new size: ${_queue.value.size}")
     }
 
     fun toggleShuffleMode() {
-        val currentSongId = _currentSong.value?.id ?: -1L
-
         _shuffleMode.value =
                 if (_shuffleMode.value == ShuffleMode.OFF) {
-                    applyShuffleToQueue(currentSongId)
                     ShuffleMode.ON
                 } else {
-                    _queue.value = _originalQueue.value
-
-                    if (currentSongId > 0) {
-                        currentQueueIndex = _queue.value.indexOfFirst { it.songId == currentSongId }
-                    }
-
                     ShuffleMode.OFF
                 }
 
-        Log.d(
-                TAG,
-                "Shuffle mode toggled to: ${_shuffleMode.value}, queue size: ${_queue.value.size}"
-        )
+        Log.d(TAG, "Shuffle mode toggled to: ${_shuffleMode.value}")
     }
 
     /** Cycles through repeat modes: NONE -> ALL -> ONE -> NONE */
@@ -580,79 +616,53 @@ constructor(
         }
 
         Log.d(TAG, "Repeat mode changed to: $newMode")
+
+        updateNavigationState()
     }
 
     private fun handlePlaybackEnd() {
-        Log.d(
-                TAG,
-                "Handling playback end with repeat mode: ${_repeatMode.value}, currentQueueIndex: $currentQueueIndex, queue size: ${_queue.value.size}"
-        )
+        // Set flag to prevent multiple handlers from running simultaneously
+        if (handlingPlaybackEnd) {
+            Log.d(TAG, "Already handling playback end, ignoring additional call")
+            return
+        }
+        handlingPlaybackEnd = true
 
-        if (_queue.value.isEmpty()) {
-            Log.d(TAG, "Queue is empty, nothing to do")
+        Log.d(TAG, "Handling playback end with repeat mode: ${_repeatMode.value}")
+
+        if (_repeatMode.value == RepeatMode.ONE) {
+            Log.d(TAG, "RepeatMode.ONE: Repeating current song")
+            mediaController?.seekTo(0)
+            mediaController?.play()
+            handlingPlaybackEnd = false
             return
         }
 
-        when (_repeatMode.value) {
-            RepeatMode.ONE -> {
-                Log.d(TAG, "RepeatMode.ONE: Repeating current song")
-                mediaController?.seekTo(0)
-                mediaController?.play()
-            }
-            RepeatMode.ALL -> {
-                if (currentQueueIndex >= _queue.value.size - 1) {
-                    Log.d(TAG, "RepeatMode.ALL: At end of queue, restarting from first song")
-                    currentQueueIndex = -1
-                    if (_queue.value.isNotEmpty()) {
-                        playSpecificQueueItem(0)
-                    }
+        if (_queue.value.isNotEmpty()) {
+            if (_isPlayingFromQueue.value) {
+                val nextQueueIndex = _currentQueueIndex.value + 1
+
+                if (nextQueueIndex < _queue.value.size) {
+                    playQueueItem(nextQueueIndex)
+                } else if (_repeatMode.value == RepeatMode.ALL && _queue.value.isNotEmpty()) {
+                    playQueueItem(0)
                 } else {
-                    Log.d(TAG, "RepeatMode.ALL: Moving to next song in queue")
-                    skipToNext()
+                    handlingPlaybackEnd = false
                 }
+            } else {
+                playQueueItem(0)
             }
-            RepeatMode.NONE -> {
-                if (currentQueueIndex < _queue.value.size - 1) {
-                    Log.d(TAG, "RepeatMode.NONE: Not at end, playing next song")
-                    skipToNext()
-                } else {
-                    Log.d(TAG, "RepeatMode.NONE: At end of queue, stopping playback")
+        } else {
+            if (currentPlaybackIndex < _playbackList.value.size - 1) {
+                currentPlaybackIndex++
+                playMediaItem(_playbackList.value[currentPlaybackIndex])
+            } else if (_repeatMode.value == RepeatMode.ALL && _playbackList.value.isNotEmpty()) {
+                currentPlaybackIndex = 0
+                if (_playbackList.value.isNotEmpty()) {
+                    playMediaItem(_playbackList.value[0])
                 }
-            }
-        }
-    }
-
-    private fun playSpecificQueueItem(index: Int) {
-        if (index < 0 || index >= _queue.value.size) {
-            Log.e(TAG, "Invalid queue index: $index (queue size: ${_queue.value.size})")
-            return
-        }
-
-        val queueItem = _queue.value[index]
-        Log.d(TAG, "Playing specific queue item at index $index (song ID: ${queueItem.songId})")
-
-        mainScope.launch(Dispatchers.Main) {
-            try {
-                val songResult = songRepository.getSongById(queueItem.songId)
-                if (songResult is Resource.Success && songResult.data != null) {
-                    currentQueueIndex = index
-
-                    val song = songResult.data
-                    playMediaItem(song)
-                    Log.d(TAG, "Successfully loaded and playing song: ${song.title}")
-                } else {
-                    Log.e(TAG, "Failed to load song at queue index $index")
-                    _error.value = "Failed to load song from queue."
-
-                    if (index < _queue.value.size - 1) {
-                        playSpecificQueueItem(index + 1)
-                    } else if (_repeatMode.value == RepeatMode.ALL && _queue.value.size > 1) {
-                        playSpecificQueueItem(0)
-                    }
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "Error playing queue item $index", e)
-                _error.value = "Error playing song: ${e.message}"
+            } else {
+                handlingPlaybackEnd = false
             }
         }
     }
@@ -680,70 +690,114 @@ constructor(
         Log.d(TAG, "Set media item and playing: ${song.title}")
     }
 
-    /** Skips to the next song in the queue, respecting repeat mode */
     fun skipToNext() {
-        if (_queue.value.isEmpty()) {
-            Log.d(TAG, "Skip to next: Queue is empty")
+        if (!_canSkipNext.value) {
+            Log.d(TAG, "Skip to next: Operation not allowed")
             return
         }
 
-        // Calculate next index
-        var nextIndex = currentQueueIndex + 1
+        // Case from queue
+        if (_isPlayingFromQueue.value) {
+            val nextIndex = _currentQueueIndex.value + 1
 
-        if (nextIndex >= _queue.value.size) {
-            if (_repeatMode.value == RepeatMode.ALL) {
-                nextIndex = 0
-                Log.d(TAG, "Skip to next: Wrapping to beginning (index 0) in REPEAT ALL mode")
+            if (nextIndex < _queue.value.size) {
+                playQueueItem(nextIndex)
+            } else if (_repeatMode.value == RepeatMode.ALL && _queue.value.isNotEmpty()) {
+                playQueueItem(0)
             } else {
-                Log.d(
-                        TAG,
-                        "Skip to next: Reached end of queue in ${_repeatMode.value} mode - not wrapping"
-                )
+                Log.d(TAG, "Skip to next: At end of queue and no repeat")
+            }
+        } else {
+            // case from regular playlist
+            if (_queue.value.isNotEmpty()) {
+                playQueueItem(0)
                 return
             }
-        }
 
-        playSpecificQueueItem(nextIndex)
+            if (_playbackList.value.isEmpty()) {
+                Log.d(TAG, "Skip to next: Playback list is empty")
+                return
+            }
+
+            var nextIndex = currentPlaybackIndex + 1
+
+            if (nextIndex >= _playbackList.value.size) {
+                if (_repeatMode.value == RepeatMode.ALL) {
+                    nextIndex = 0
+                    Log.d(TAG, "Skip to next: Wrapping to beginning (index 0) in REPEAT ALL mode")
+                } else {
+                    Log.d(TAG, "Skip to next: Reached end of playback list - not wrapping")
+                    return
+                }
+            }
+
+            // Play the next song
+            val nextSong = _playbackList.value[nextIndex]
+            currentPlaybackIndex = nextIndex
+            playMediaItem(nextSong)
+        }
     }
 
     fun skipToPrevious() {
-        if (_queue.value.isEmpty()) {
-            Log.d(TAG, "Skip to previous: Queue is empty")
-            return
-        }
-
+        // Tolerance for skipping to previous song
         if (_currentPositionMs.value > 3000) {
             Log.d(TAG, "Skip to previous: More than 3 seconds in, restarting current song")
             mediaController?.seekTo(0)
             return
         }
 
-        var prevIndex = currentQueueIndex - 1
-
-        if (prevIndex < 0) {
-            if (_repeatMode.value == RepeatMode.ALL) {
-                // Wrap to end in repeat ALL mode
-                prevIndex = _queue.value.size - 1
-                Log.d(
-                        TAG,
-                        "Skip to previous: Wrapping to end (index ${prevIndex}) in REPEAT ALL mode"
-                )
-            } else {
-                // In NONE or ONE mode, restart current song
-                Log.d(
-                        TAG,
-                        "Skip to previous: At beginning with ${_repeatMode.value} mode - restarting current song"
-                )
-                mediaController?.seekTo(0)
-                return
-            }
+        if (!_canSkipPrevious.value) {
+            Log.d(TAG, "Skip to previous: Operation not allowed")
+            mediaController?.seekTo(0)
+            return
         }
 
-        // Play the previous item
-        playSpecificQueueItem(prevIndex)
+        // Case from queue
+        if (_isPlayingFromQueue.value) {
+            val prevIndex = _currentQueueIndex.value - 1
+
+            if (prevIndex >= 0) {
+                playQueueItem(prevIndex)
+            } else if (_repeatMode.value == RepeatMode.ALL && _queue.value.isNotEmpty()) {
+                playQueueItem(_queue.value.size - 1)
+            } else {
+                mediaController?.seekTo(0)
+            }
+        } else {
+            // Case regular playback list
+            if (_playbackList.value.isEmpty()) {
+                Log.d(TAG, "Skip to previous: Playback list is empty")
+                return
+            }
+
+            var prevIndex = currentPlaybackIndex - 1
+
+            if (prevIndex < 0) {
+                if (_repeatMode.value == RepeatMode.ALL) {
+                    // Wrap to end in repeat ALL mode
+                    prevIndex = _playbackList.value.size - 1
+                    Log.d(
+                            TAG,
+                            "Skip to previous: Wrapping to end (index ${prevIndex}) in REPEAT ALL mode"
+                    )
+                } else {
+                    // In NONE mode, restart current song
+                    Log.d(
+                            TAG,
+                            "Skip to previous: At beginning and not in repeat ALL mode - restarting current song"
+                    )
+                    mediaController?.seekTo(0)
+                    return
+                }
+            }
+
+            val prevSong = _playbackList.value[prevIndex]
+            currentPlaybackIndex = prevIndex
+            playMediaItem(prevSong)
+        }
     }
 
-    /** Skips to the previous song in the queue, or replays current song */
+    /** Releases the media controller */
     fun releaseController() {
         Log.d(TAG, "Releasing MediaController.")
         stopPositionUpdates()

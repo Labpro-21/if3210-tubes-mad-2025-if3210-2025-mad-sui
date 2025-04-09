@@ -17,10 +17,11 @@ data class LibraryScreenState(
         val selectedTab: Int = 0,
         val isLoadingSongs: Boolean = true,
         val libraryError: String? = null,
-        val selectedSong: SongEntity? = null,
         val isContextMenuVisible: Boolean = false,
         val searchQuery: String = "",
-        val originalSongs: List<SongEntity> = emptyList()
+        val originalSongs: List<SongEntity> = emptyList(),
+        val showEditDialog: Boolean = false,
+        val songToEdit: SongEntity? = null
 )
 
 @HiltViewModel
@@ -136,24 +137,15 @@ constructor(
         playbackStateManager.playPause()
     }
 
-    fun addToQueue(song: SongEntity) {
-        playbackStateManager.addToQueue(song)
-    }
-
-    fun showContextMenuForSong(song: SongEntity) {
-        _state.update { it.copy(selectedSong = song, isContextMenuVisible = true) }
-    }
-
-    fun hideContextMenu() {
-        _state.update { it.copy(isContextMenuVisible = false) }
-    }
-
-    fun toggleFavoriteForSelectedSong() {
-        val song = _state.value.selectedSong ?: return
-
+    fun toggleFavoriteForSong(song: SongEntity) {
         viewModelScope.launch {
             val newLikedStatus = !song.isLiked
             songRepository.updateLikeStatus(song.id, newLikedStatus)
+
+            if (song.id == currentSong.value?.id) {
+                playbackStateManager.refreshCurrentSongData()
+            }
+
             refreshSongs()
         }
     }
@@ -178,5 +170,13 @@ constructor(
         if (refreshList) {
             refreshSongs()
         }
+    }
+
+    fun showEditDialog(song: SongEntity) {
+        _state.update { it.copy(showEditDialog = true, songToEdit = song) }
+    }
+
+    fun hideEditDialog() {
+        _state.update { it.copy(showEditDialog = false, songToEdit = null) }
     }
 }

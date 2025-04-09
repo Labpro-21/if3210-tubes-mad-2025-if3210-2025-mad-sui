@@ -31,6 +31,10 @@ constructor(
     val queue = playbackStateManager.queue
     val repeatMode = playbackStateManager.repeatMode
     val shuffleMode = playbackStateManager.shuffleMode
+    val canSkipNext = playbackStateManager.canSkipNext
+    val canSkipPrevious = playbackStateManager.canSkipPrevious
+    val currentQueueIndex = playbackStateManager.currentQueueIndex
+    val isPlayingFromQueue = playbackStateManager.isPlayingFromQueue
 
     // Queue songs for display
     private val _queueSongs = MutableStateFlow<List<SongEntity>>(emptyList())
@@ -113,8 +117,7 @@ constructor(
 
     fun playQueueItemAt(index: Int) {
         if (index >= 0 && index < _queueSongs.value.size) {
-            val song = _queueSongs.value[index]
-            playbackStateManager.playSong(song)
+            playbackStateManager.playQueueItem(index)
         }
     }
 
@@ -126,11 +129,38 @@ constructor(
         playbackStateManager.cycleRepeatMode()
     }
 
+    // Add a song to the manual queue
     fun addToQueue(song: SongEntity) {
+        if (isInQueue(song.id)) {
+            viewModelScope.launch { _uiEvents.emit(UiEvent.ShowSnackbar("Song already in queue")) }
+            return
+        }
+
         playbackStateManager.addToQueue(song)
         viewModelScope.launch {
             _uiEvents.emit(UiEvent.ShowSnackbar("Added to queue: ${song.title}"))
         }
+    }
+
+    fun removeFromQueue(song: SongEntity) {
+        playbackStateManager.removeFromQueue(song.id)
+        viewModelScope.launch {
+            _uiEvents.emit(UiEvent.ShowSnackbar("Removed from queue: ${song.title}"))
+        }
+    }
+
+    fun isInQueue(songId: Long): Boolean {
+        return playbackStateManager.isInQueue(songId)
+    }
+
+    fun checkSongStatus(song: SongEntity): SongStatus {
+        val currentSongId = currentSong.value?.id
+
+        if (song.id == currentSongId) {
+            return SongStatus.CURRENTLY_PLAYING
+        }
+
+        return if (isInQueue(song.id)) SongStatus.IN_QUEUE else SongStatus.NOT_IN_QUEUE
     }
 
     fun toggleFavorite() {
@@ -159,9 +189,7 @@ constructor(
                 }
             } else {
                 Log.w("PlayerViewModel", "toggleFavorite called but currentSong is null.")
-                viewModelScope.launch {
-                    _uiEvents.emit(UiEvent.ShowSnackbar("No song playing to like."))
-                }
+                _uiEvents.emit(UiEvent.ShowSnackbar("No song playing to like."))
             }
         }
     }
@@ -169,5 +197,17 @@ constructor(
     fun onPlayerClicked() {
         Log.d("PlayerViewModel", "Minimized Player clicked - Requesting navigation.")
         viewModelScope.launch { _uiEvents.emit(UiEvent.NavigateToFullScreenPlayer) }
+    }
+
+    // Toggle a song's queue status
+    fun toggleQueueStatus(song: SongEntity) {
+        val status = checkSongStatus(song)
+        when (status) {
+            SongStatus.IN_QUEUE -> removeFromQueue(song)
+            SongStatus.NOT_IN_QUEUE -> addToQueue(song)
+            SongStatus.CURRENTLY_PLAYING -> {
+                addToQueue(song)
+            }
+        }
     }
 }

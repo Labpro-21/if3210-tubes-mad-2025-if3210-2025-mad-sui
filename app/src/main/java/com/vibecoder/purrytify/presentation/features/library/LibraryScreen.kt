@@ -39,16 +39,13 @@ fun LibraryScreen(
         playerViewModel: PlayerViewModel = hiltViewModel()
 ) {
     val libraryState by libraryViewModel.state.collectAsStateWithLifecycle()
-    val currentSong by libraryViewModel.currentSong.collectAsStateWithLifecycle()
-    val isPlaying by libraryViewModel.isPlaying.collectAsStateWithLifecycle()
+    val currentSong by playerViewModel.currentSong.collectAsStateWithLifecycle()
+    val isPlaying by playerViewModel.isPlaying.collectAsStateWithLifecycle()
     val tabs = listOf("All", "Liked")
     var showSearchBar by remember { mutableStateOf(false) }
 
     var selectedSong by remember { mutableStateOf<SongEntity?>(null) }
-    var selectedSongStatus by remember { mutableStateOf(PlayerViewModel.SongStatus.NOT_IN_QUEUE) }
-
-    val queueSongs by playerViewModel.queueSongs.collectAsStateWithLifecycle()
-
+    var showContextMenu by remember { mutableStateOf(false) }
 
     val permission =
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -186,7 +183,7 @@ fun LibraryScreen(
                 }
             }
             else -> {
-                // Using Compose LazyColumn instead of RecyclerView
+                // Using Compose LazyColumn
                 LazyColumn(
                         modifier = Modifier.weight(1f),
                         contentPadding = PaddingValues(vertical = 8.dp)
@@ -199,7 +196,7 @@ fun LibraryScreen(
                                 title = song.title,
                                 artist = song.artist,
                                 coverUrl = song.coverArtUri ?: "",
-                                isPlaying = isPlaying && isCurrentSong,
+                                isPlaying = isSongPlaying,
                                 isCurrentSong = isCurrentSong,
                                 onClick = { libraryViewModel.onPlaySong(song) },
                                 onPlayPauseClick = {
@@ -211,9 +208,7 @@ fun LibraryScreen(
                                 },
                                 onMoreOptionsClick = {
                                     selectedSong = song
-                                    selectedSongStatus =
-                                            PlayerViewModel.SongStatus.CURRENTLY_PLAYING
-                                    libraryViewModel.showContextMenuForSong(song)
+                                    showContextMenu = true
                                 }
                         )
 
@@ -229,18 +224,26 @@ fun LibraryScreen(
     }
 
     // Song Context Menu
-    libraryState.selectedSong?.let { song ->
+    selectedSong?.let { song ->
         SongContextMenu(
                 song = song,
-                isOpen = libraryState.isContextMenuVisible,
-                onDismiss = libraryViewModel::hideContextMenu,
-                songStatus = PlayerViewModel.SongStatus.CURRENTLY_PLAYING,
-                onPlayPauseClick = {},
-                onToggleQueueClick = {},
-                onToggleFavorite = libraryViewModel::toggleFavoriteForSelectedSong,
+                isOpen = showContextMenu,
+                onDismiss = { showContextMenu = false },
+                songStatus = playerViewModel.checkSongStatus(song),
+                isPlaying = isPlaying && song.id == currentSong?.id,
+                onPlayPauseClick = {
+                    if (song.id == currentSong?.id) {
+                        playerViewModel.togglePlayPause()
+                    } else {
+                        libraryViewModel.onPlaySong(song)
+                    }
+                },
+                onToggleQueueClick = { playerViewModel.toggleQueueStatus(song) },
+                onToggleFavorite = { libraryViewModel.toggleFavoriteForSong(song) },
                 onDelete = { libraryViewModel.deleteSong(song.id) },
                 onEdit = {
                     // TODO: Implement edit functionality
+                    libraryViewModel.showEditDialog(song)
                 }
         )
     }
@@ -249,7 +252,7 @@ fun LibraryScreen(
         val bottomSheetViewModel: SongBottomSheetViewModel = hiltViewModel()
         val bottomSheetState by bottomSheetViewModel.state.collectAsStateWithLifecycle()
 
-        //  contract
+        // File picker contracts
         val audioPickerLauncher =
                 rememberLauncherForActivityResult(
                         contract = ActivityResultContracts.OpenDocument(),

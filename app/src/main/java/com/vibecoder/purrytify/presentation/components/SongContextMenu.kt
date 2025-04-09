@@ -1,6 +1,5 @@
 package com.vibecoder.purrytify.presentation.components
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
@@ -10,9 +9,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
@@ -31,6 +30,7 @@ fun SongContextMenu(
         onToggleFavorite: () -> Unit,
         onDelete: () -> Unit,
         onEdit: () -> Unit,
+        isPlaying: Boolean = false
 ) {
     if (isOpen) {
         Dialog(onDismissRequest = onDismiss) {
@@ -39,53 +39,51 @@ fun SongContextMenu(
                     shape = MaterialTheme.shapes.medium,
                     colors = CardDefaults.cardColors(containerColor = DarkGray)
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    // Song Info
-                    Row(
-                            modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                Column(modifier = Modifier.padding(vertical = 16.dp)) {
+                    // Song Title and Artist
+                    Column(
+                            modifier =
+                                    Modifier.fillMaxWidth()
+                                            .padding(horizontal = 16.dp)
+                                            .padding(bottom = 16.dp)
                     ) {
-                        AsyncImageWithFallback(
-                                url = song.coverArtUri,
-                                contentDescription = "Song Cover",
-                                modifier = Modifier.size(56.dp).clip(MaterialTheme.shapes.small)
+                        Text(
+                                text = song.title,
+                                style = MaterialTheme.typography.titleMedium,
+                                color = Color.White,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                fontWeight = FontWeight.Bold
                         )
-
-                        Spacer(modifier = Modifier.width(12.dp))
-
-                        Column {
-                            Text(
-                                    text = song.title,
-                                    style = MaterialTheme.typography.titleMedium,
-                                    color = Color.White,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                            )
-                            Text(
-                                    text = song.artist,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = Color.White.copy(alpha = 0.7f),
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                            )
-                        }
+                        Text(
+                                text = song.artist,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = Color.White.copy(alpha = 0.7f),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                        )
                     }
 
-                    Divider(color = Color.White.copy(alpha = 0.1f))
+                    HorizontalDivider(color = Color.White.copy(alpha = 0.1f))
 
                     // Play/Pause option
-                    MenuOption(
+                    ContextMenuItem(
                             icon =
-                                    when (songStatus) {
-                                        PlayerViewModel.SongStatus.CURRENTLY_PLAYING ->
-                                                Icons.Default.Pause
-                                        else -> Icons.Default.PlayArrow
-                                    },
+                                    if (isPlaying &&
+                                                    songStatus ==
+                                                            PlayerViewModel.SongStatus
+                                                                    .CURRENTLY_PLAYING
+                                    )
+                                            Icons.Default.Pause
+                                    else Icons.Default.PlayArrow,
                             text =
-                                    when (songStatus) {
-                                        PlayerViewModel.SongStatus.CURRENTLY_PLAYING -> "Pause"
-                                        else -> "Play Now"
-                                    },
+                                    if (isPlaying &&
+                                                    songStatus ==
+                                                            PlayerViewModel.SongStatus
+                                                                    .CURRENTLY_PLAYING
+                                    )
+                                            "Pause"
+                                    else "Play",
                             onClick = {
                                 onPlayPauseClick()
                                 onDismiss()
@@ -93,18 +91,15 @@ fun SongContextMenu(
                     )
 
                     // Queue option
-                    MenuOption(
+                    ContextMenuItem(
                             icon =
-                                    when (songStatus) {
-                                        PlayerViewModel.SongStatus.IN_QUEUE ->
-                                                Icons.Default.RemoveFromQueue
-                                        else -> Icons.Outlined.QueueMusic
-                                    },
+                                    if (songStatus == PlayerViewModel.SongStatus.IN_QUEUE)
+                                            Icons.Default.RemoveFromQueue
+                                    else Icons.Outlined.QueueMusic,
                             text =
-                                    when (songStatus) {
-                                        PlayerViewModel.SongStatus.IN_QUEUE -> "Remove from Queue"
-                                        else -> "Add to Queue"
-                                    },
+                                    if (songStatus == PlayerViewModel.SongStatus.IN_QUEUE)
+                                            "Remove from Queue"
+                                    else "Add to Queue",
                             onClick = {
                                 onToggleQueueClick()
                                 onDismiss()
@@ -112,7 +107,7 @@ fun SongContextMenu(
                     )
 
                     // Like option
-                    MenuOption(
+                    ContextMenuItem(
                             icon =
                                     if (song.isLiked) Icons.Default.Favorite
                                     else Icons.Default.FavoriteBorder,
@@ -126,7 +121,7 @@ fun SongContextMenu(
                     )
 
                     // Edit option
-                    MenuOption(
+                    ContextMenuItem(
                             icon = Icons.Default.Edit,
                             text = "Edit Song",
                             onClick = {
@@ -136,7 +131,7 @@ fun SongContextMenu(
                     )
 
                     // Delete option
-                    MenuOption(
+                    ContextMenuItem(
                             icon = Icons.Default.Delete,
                             text = "Delete Song",
                             onClick = {
@@ -152,7 +147,7 @@ fun SongContextMenu(
 }
 
 @Composable
-private fun MenuOption(
+private fun ContextMenuItem(
         icon: ImageVector,
         text: String,
         onClick: () -> Unit,
@@ -160,7 +155,9 @@ private fun MenuOption(
 ) {
     Row(
             modifier =
-                    Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 12.dp),
+                    Modifier.fillMaxWidth()
+                            .clickable(onClick = onClick)
+                            .padding(vertical = 12.dp, horizontal = 16.dp),
             verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(
@@ -173,29 +170,5 @@ private fun MenuOption(
         Spacer(modifier = Modifier.width(16.dp))
 
         Text(text = text, style = MaterialTheme.typography.bodyLarge, color = tint)
-    }
-}
-
-@Composable
-private fun AsyncImageWithFallback(
-        url: String?,
-        contentDescription: String?,
-        modifier: Modifier = Modifier
-) {
-    if (url.isNullOrEmpty()) {
-        Box(modifier = modifier.background(Color.Gray), contentAlignment = Alignment.Center) {
-            Icon(
-                    imageVector = Icons.Default.MusicNote,
-                    contentDescription = contentDescription,
-                    tint = Color.White
-            )
-        }
-    } else {
-        androidx.compose.foundation.Image(
-                painter = coil.compose.rememberAsyncImagePainter(model = url),
-                contentDescription = contentDescription,
-                modifier = modifier,
-                contentScale = androidx.compose.ui.layout.ContentScale.Crop
-        )
     }
 }
