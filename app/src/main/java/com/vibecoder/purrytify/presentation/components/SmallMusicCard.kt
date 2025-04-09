@@ -5,11 +5,12 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -27,121 +28,125 @@ fun SmallMusicCard(
         isPlaying: Boolean = false,
         isCurrentSong: Boolean = false,
         onClick: () -> Unit,
-        onPlayPauseClick: () -> Unit = {}
+        onPlayPauseClick: () -> Unit = {},
+        onMoreOptionsClick: () -> Unit = {},
 ) {
-        Row(
-                modifier =
-                        Modifier.fillMaxWidth()
-                                .clickable(onClick = onClick)
-                                .padding(vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically
-        ) {
-                Box(modifier = Modifier.size(52.dp), contentAlignment = Alignment.Center) {
-                        Image(
-                                painter = rememberAsyncImagePainter(model = coverUrl),
-                                contentDescription = title,
-                                modifier = Modifier.fillMaxSize().clip(MaterialTheme.shapes.small),
-                                contentScale = ContentScale.Crop
-                        )
+    Row(
+            modifier =
+                    Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(modifier = Modifier.size(52.dp), contentAlignment = Alignment.Center) {
+            Image(
+                    painter = rememberAsyncImagePainter(model = coverUrl),
+                    contentDescription = title,
+                    modifier = Modifier.fillMaxSize().clip(MaterialTheme.shapes.small),
+                    contentScale = ContentScale.Crop
+            )
 
-                        // Show play/pause overlay if this is the current song
-                        if (isCurrentSong) {
-                                Box(
-                                        modifier =
-                                                Modifier.fillMaxSize()
-                                                        .clip(MaterialTheme.shapes.small)
-                                                        .background(
-                                                                MaterialTheme.colorScheme.background
-                                                                        .copy(alpha = 0.5f)
-                                                        ),
-                                        contentAlignment = Alignment.Center
-                                ) {
-                                        IconButton(
-                                                onClick = onPlayPauseClick,
-                                                modifier = Modifier.size(32.dp)
-                                        ) {
-                                                Icon(
-                                                        imageVector =
-                                                                if (isPlaying) Icons.Default.Pause
-                                                                else Icons.Default.PlayArrow,
-                                                        contentDescription =
-                                                                if (isPlaying) "Pause" else "Play",
-                                                        tint = MaterialTheme.colorScheme.primary
+            // Show play/pause overlay if this is the current song
+            if (isCurrentSong) {
+                Box(
+                        modifier =
+                                Modifier.fillMaxSize()
+                                        .clip(MaterialTheme.shapes.small)
+                                        .background(
+                                                MaterialTheme.colorScheme.background.copy(
+                                                        alpha = 0.5f
                                                 )
-                                        }
-                                }
-                        }
-                }
-
-                Spacer(modifier = Modifier.width(12.dp))
-
-                Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                                text = title,
-                                style = MaterialTheme.typography.bodyLarge,
-                                maxLines = 1,
-                                color =
-                                        if (isCurrentSong) MaterialTheme.colorScheme.primary
-                                        else MaterialTheme.colorScheme.onBackground
-                        )
-                        Text(
-                                text = artist,
-                                style = MaterialTheme.typography.bodyMedium,
-                                color =
-                                        if (isCurrentSong)
-                                                MaterialTheme.colorScheme.primary.copy(alpha = 0.8f)
-                                        else MaterialTheme.colorScheme.secondary,
-                                maxLines = 1
-                        )
-                }
-
-                // Add an icon to indicate the current song
-                if (isCurrentSong && !isPlaying) {
+                                        ),
+                        contentAlignment = Alignment.Center
+                ) {
+                    IconButton(onClick = onPlayPauseClick, modifier = Modifier.size(32.dp)) {
                         Icon(
-                                imageVector = Icons.Default.MusicNote,
-                                contentDescription = "Current Song",
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.padding(end = 8.dp)
+                                imageVector =
+                                        if (isPlaying) Icons.Default.Pause
+                                        else Icons.Default.PlayArrow,
+                                contentDescription = if (isPlaying) "Pause" else "Play",
+                                tint = MaterialTheme.colorScheme.primary
                         )
+                    }
                 }
+            }
         }
+
+        Spacer(modifier = Modifier.width(12.dp))
+
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                    text = title,
+                    style = MaterialTheme.typography.bodyLarge,
+                    maxLines = 1,
+                    color =
+                            if (isCurrentSong) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.onBackground
+            )
+            Text(
+                    text = artist,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color =
+                            if (isCurrentSong) MaterialTheme.colorScheme.primary.copy(alpha = 0.8f)
+                            else MaterialTheme.colorScheme.secondary,
+                    maxLines = 1
+            )
+        }
+
+        // options menu button
+        IconButton(onClick = onMoreOptionsClick) {
+            Icon(
+                    imageVector = Icons.Default.MoreVert,
+                    contentDescription = "More Options",
+                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+            )
+        }
+
+        // an icon to indicate the current song
+        if (isCurrentSong && !isPlaying) {
+            Icon(
+                    imageVector = Icons.Default.MusicNote,
+                    contentDescription = "Current Song",
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(end = 8.dp)
+            )
+        }
+    }
 }
 
 @Preview(showBackground = true)
 @Composable
 fun SmallMusicCardPreview() {
-        PurrytifyTheme {
-                Column {
-                        SmallMusicCard(
-                                title = "Normal Song",
-                                artist = "Artist Name",
-                                coverUrl = "https://example.com/cover.jpg",
-                                isPlaying = false,
-                                isCurrentSong = false,
-                                onClick = {}
-                        )
+    PurrytifyTheme {
+        Column {
+            SmallMusicCard(
+                    title = "Normal Song",
+                    artist = "Artist Name",
+                    coverUrl = "https://example.com/cover.jpg",
+                    isPlaying = false,
+                    isCurrentSong = false,
+                    onClick = {}
+            )
 
-                        Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
-                        SmallMusicCard(
-                                title = "Current Song",
-                                artist = "Artist Name",
-                                coverUrl = "https://example.com/cover.jpg",
-                                isPlaying = false,
-                                isCurrentSong = true,
-                                onClick = {}
-                        )
+            SmallMusicCard(
+                    title = "Current Song",
+                    artist = "Artist Name",
+                    coverUrl = "https://example.com/cover.jpg",
+                    isPlaying = false,
+                    isCurrentSong = true,
+                    onClick = {}
+            )
 
-                        Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
-                        SmallMusicCard(
-                                title = "Playing Song",
-                                artist = "Artist Name",
-                                coverUrl = "https://example.com/cover.jpg",
-                                isPlaying = true,
-                                isCurrentSong = true,
-                                onClick = {}
-                        )
-                }
+            SmallMusicCard(
+                    title = "Playing Song",
+                    artist = "Artist Name",
+                    coverUrl = "https://example.com/cover.jpg",
+                    isPlaying = true,
+                    isCurrentSong = true,
+                    onClick = {}
+            )
         }
+    }
 }

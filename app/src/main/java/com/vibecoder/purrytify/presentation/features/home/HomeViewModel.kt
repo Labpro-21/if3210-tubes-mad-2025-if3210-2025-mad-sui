@@ -36,7 +36,6 @@ constructor(
     init {
         loadHomepageSongs()
 
-        // Subscribe to recently played changes
         viewModelScope.launch {
             playbackStateManager.recentlyPlayed.collect { recentSongs ->
                 _state.update { it.copy(recentlyPlayed = recentSongs) }
@@ -72,7 +71,6 @@ constructor(
     }
 
     fun selectSong(song: SongEntity) {
-        // Play song with current section songs as queue
         if (_state.value.recentlyPlayed.contains(song)) {
             playbackStateManager.playSong(song, _state.value.recentlyPlayed)
         } else {

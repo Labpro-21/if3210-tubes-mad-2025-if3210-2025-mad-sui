@@ -11,14 +11,27 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.vibecoder.purrytify.data.local.model.SongEntity
 import com.vibecoder.purrytify.presentation.components.MusicCard
 import com.vibecoder.purrytify.presentation.components.SmallMusicCard
+import com.vibecoder.purrytify.presentation.components.SongContextMenu
+import com.vibecoder.purrytify.presentation.features.player.PlayerViewModel
 
 @Composable
-fun HomeScreen(viewModel: HomeViewModel = hiltViewModel()) {
+fun HomeScreen(
+        viewModel: HomeViewModel = hiltViewModel(),
+        playerViewModel: PlayerViewModel = hiltViewModel()
+) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val currentSong by viewModel.currentSong.collectAsStateWithLifecycle()
     val isPlaying by viewModel.isPlaying.collectAsStateWithLifecycle()
+
+    // State for the context menu
+    var selectedSong by remember { mutableStateOf<SongEntity?>(null) }
+    var showContextMenu by remember { mutableStateOf(false) }
+    var selectedSongStatus by remember { mutableStateOf(PlayerViewModel.SongStatus.NOT_IN_QUEUE) }
+
+    val queueSongs by playerViewModel.queueSongs.collectAsStateWithLifecycle()
 
     Box(modifier = Modifier.fillMaxSize()) {
         when {
@@ -57,12 +70,12 @@ fun HomeScreen(viewModel: HomeViewModel = hiltViewModel()) {
                                             isCurrentSong = isCurrentSong,
                                             isPlaying = isSongPlaying,
                                             onClick = { viewModel.selectSong(song) },
-                                            onPlayPauseClick = {
-                                                if (isCurrentSong) {
-                                                    viewModel.togglePlayPause()
-                                                } else {
-                                                    viewModel.selectSong(song)
-                                                }
+                                            onPlayPauseClick = {},
+                                            onMoreOptionsClick = {
+                                                selectedSong = song
+                                                selectedSongStatus =
+                                                        PlayerViewModel.SongStatus.CURRENTLY_PLAYING
+                                                showContextMenu = true
                                             }
                                     )
                                 }
@@ -92,6 +105,12 @@ fun HomeScreen(viewModel: HomeViewModel = hiltViewModel()) {
                                                 } else {
                                                     viewModel.selectSong(song)
                                                 }
+                                            },
+                                            onMoreOptionsClick = {
+                                                selectedSong = song
+                                                selectedSongStatus =
+                                                        PlayerViewModel.SongStatus.CURRENTLY_PLAYING
+                                                showContextMenu = true
                                             }
                                     )
                                     HorizontalDivider(
@@ -118,6 +137,25 @@ fun HomeScreen(viewModel: HomeViewModel = hiltViewModel()) {
                 }
             }
         }
+    }
+
+    // Context Menu
+    selectedSong?.let { song ->
+        SongContextMenu(
+                song = song,
+                isOpen = showContextMenu,
+                onDismiss = { showContextMenu = false },
+                songStatus = selectedSongStatus,
+                onPlayPauseClick = {},
+                onToggleQueueClick = {},
+                onToggleFavorite = {},
+                onDelete = {
+                    // TODO: Implement this
+                },
+                onEdit = {
+                    // TODO: Implement this
+                }
+        )
     }
 }
 

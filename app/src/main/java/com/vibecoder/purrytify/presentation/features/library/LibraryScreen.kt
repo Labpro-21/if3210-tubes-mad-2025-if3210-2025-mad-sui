@@ -26,18 +26,29 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberPermissionState
+import com.vibecoder.purrytify.data.local.model.SongEntity
 import com.vibecoder.purrytify.presentation.components.SmallMusicCard
 import com.vibecoder.purrytify.presentation.components.SongBottomSheet
 import com.vibecoder.purrytify.presentation.components.SongContextMenu
+import com.vibecoder.purrytify.presentation.features.player.PlayerViewModel
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalPermissionsApi::class)
 @Composable
-fun LibraryScreen(libraryViewModel: LibraryViewModel = hiltViewModel()) {
+fun LibraryScreen(
+        libraryViewModel: LibraryViewModel = hiltViewModel(),
+        playerViewModel: PlayerViewModel = hiltViewModel()
+) {
     val libraryState by libraryViewModel.state.collectAsStateWithLifecycle()
     val currentSong by libraryViewModel.currentSong.collectAsStateWithLifecycle()
     val isPlaying by libraryViewModel.isPlaying.collectAsStateWithLifecycle()
     val tabs = listOf("All", "Liked")
     var showSearchBar by remember { mutableStateOf(false) }
+
+    var selectedSong by remember { mutableStateOf<SongEntity?>(null) }
+    var selectedSongStatus by remember { mutableStateOf(PlayerViewModel.SongStatus.NOT_IN_QUEUE) }
+
+    val queueSongs by playerViewModel.queueSongs.collectAsStateWithLifecycle()
+
 
     val permission =
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -182,6 +193,7 @@ fun LibraryScreen(libraryViewModel: LibraryViewModel = hiltViewModel()) {
                 ) {
                     items(items = libraryState.songs, key = { song -> song.id }) { song ->
                         val isCurrentSong = song.id == currentSong?.id
+                        val isSongPlaying = isCurrentSong && isPlaying
 
                         SmallMusicCard(
                                 title = song.title,
@@ -196,6 +208,12 @@ fun LibraryScreen(libraryViewModel: LibraryViewModel = hiltViewModel()) {
                                     } else {
                                         libraryViewModel.onPlaySong(song)
                                     }
+                                },
+                                onMoreOptionsClick = {
+                                    selectedSong = song
+                                    selectedSongStatus =
+                                            PlayerViewModel.SongStatus.CURRENTLY_PLAYING
+                                    libraryViewModel.showContextMenuForSong(song)
                                 }
                         )
 
@@ -216,8 +234,9 @@ fun LibraryScreen(libraryViewModel: LibraryViewModel = hiltViewModel()) {
                 song = song,
                 isOpen = libraryState.isContextMenuVisible,
                 onDismiss = libraryViewModel::hideContextMenu,
-                onPlayNow = { libraryViewModel.onPlaySong(song) },
-                onAddToQueue = { libraryViewModel.addToQueue(song) },
+                songStatus = PlayerViewModel.SongStatus.CURRENTLY_PLAYING,
+                onPlayPauseClick = {},
+                onToggleQueueClick = {},
                 onToggleFavorite = libraryViewModel::toggleFavoriteForSelectedSong,
                 onDelete = { libraryViewModel.deleteSong(song.id) },
                 onEdit = {

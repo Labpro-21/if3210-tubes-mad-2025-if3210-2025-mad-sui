@@ -79,6 +79,12 @@ constructor(
         ONE
     }
 
+    enum class SongStatus {
+        CURRENTLY_PLAYING,
+        IN_QUEUE,
+        NOT_IN_QUEUE
+    }
+
     init {
         refreshQueueSongs()
 
