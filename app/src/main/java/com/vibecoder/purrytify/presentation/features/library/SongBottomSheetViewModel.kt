@@ -227,6 +227,15 @@ constructor(
 
                         playbackStateManager.refreshRecentlyPlayed(delayMs = 300)
 
+                        val currentSongId = playbackStateManager.currentSong.value?.id
+                        if (currentSongId == updatedSong.id) {
+                            Log.d(
+                                    "SongBottomSheetVM",
+                                    "Edited the currently playing song, refreshing player state"
+                            )
+                            playbackStateManager.refreshCurrentSongData()
+                        }
+
                         _eventFlow.emit(SheetEvent.SaveSuccess)
                     }
                     is Resource.Error -> {

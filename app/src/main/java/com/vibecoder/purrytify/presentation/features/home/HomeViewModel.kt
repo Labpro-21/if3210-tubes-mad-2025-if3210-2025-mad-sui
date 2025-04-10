@@ -9,6 +9,7 @@ import com.vibecoder.purrytify.playback.PlaybackStateManager
 import com.vibecoder.purrytify.util.Resource
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
@@ -110,11 +111,28 @@ constructor(
                     playbackStateManager.removeFromRecentlyPlayed(song.id)
 
                     if (song.id == currentSong.value?.id) {
-                        playbackStateManager.skipToNext()
+                        if (playbackStateManager.isPlayingFromQueue.value) {
+                            Log.d(
+                                    "HomeViewModel",
+                                    "Deleted currently playing song - skipping to next in queue"
+                            )
+                            playbackStateManager.skipToNext()
+                        } else {
+                            Log.d(
+                                    "HomeViewModel",
+                                    "Deleted currently playing song - stopping playback"
+                            )
+                            playbackStateManager.stopPlayback()
+                        }
                     }
 
                     loadHomepageSongs()
-                    Log.d("HomeViewModel", "Song deleted successfully.")
+                    Log.d("HomeViewModel", "Song deleted successfully: ${song.title}")
+
+                    if (song.id == currentSong.value?.id) {
+                        delay(300)
+                        playbackStateManager.refreshCurrentSongData()
+                    }
                 }
                 is Resource.Error -> {
                     Log.e("HomeViewModel", "Error deleting song: ${result.message}")
@@ -131,9 +149,16 @@ constructor(
     }
 
     fun hideEditSongDialog(refreshList: Boolean = false) {
+        val editedSongId = _state.value.songToEdit?.id
         _state.update { it.copy(showEditDialog = false, songToEdit = null) }
+
         if (refreshList) {
             refreshSongs()
+
+            if (editedSongId != null && editedSongId == currentSong.value?.id) {
+                Log.d("HomeViewModel", "Edited currently playing song, refreshing player state")
+                playbackStateManager.refreshCurrentSongData()
+            }
         }
     }
 

@@ -262,15 +262,44 @@ constructor(
             when (val resource = songRepository.getSongById(songId)) {
                 is Resource.Success -> {
                     if (_currentSong.value?.id == songId) {
-                        _currentSong.value = resource.data
-                        if (resource.data == null)
-                                Log.w(TAG, "Current song $songId seems to have been deleted.")
+                        val oldSong = _currentSong.value
+                        val newSong = resource.data
+
+                        if (newSong == null) {
+                            Log.w(TAG, "Current song $songId seems to have been deleted.")
+                            _currentSong.value = null
+
+                            stopPlayback()
+                        } else if (oldSong != newSong) {
+                            Log.d(
+                                    TAG,
+                                    "Song data updated - Old: ${oldSong?.title} by ${oldSong?.artist}, " +
+                                            "New: ${newSong.title} by ${newSong.artist}"
+                            )
+
+                            _currentSong.value = newSong
+
+                            mediaController?.let { controller ->
+                                if (controller.currentMediaItem?.mediaId == songId.toString()) {
+                                    Log.d(TAG, "Updating media metadata for ${newSong.title}")
+                                }
+                            }
+                        } else {
+                            Log.d(TAG, "Song data unchanged for $songId")
+                        }
                     } else {
                         Log.d(TAG, "Song changed during refresh, ignoring result for $songId.")
                     }
                 }
                 is Resource.Error -> {
                     Log.e(TAG, "Error refreshing song $songId from repo: ${resource.message}")
+
+                    if (resource.message?.contains("not found", ignoreCase = true) == true ||
+                                    resource.message?.contains("deleted", ignoreCase = true) == true
+                    ) {
+                        Log.w(TAG, "Song $songId might have been deleted, resetting current song")
+                        _currentSong.value = null
+                    }
                 }
                 else -> {}
             }

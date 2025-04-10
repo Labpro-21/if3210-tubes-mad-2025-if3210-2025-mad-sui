@@ -9,6 +9,7 @@ import com.vibecoder.purrytify.playback.PlaybackStateManager
 import com.vibecoder.purrytify.util.Resource
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
@@ -155,22 +156,40 @@ constructor(
 
     fun deleteSong(songId: Long) {
         viewModelScope.launch {
+            val songTitle = _state.value.songs.find { it.id == songId }?.title ?: "Unknown song"
+
             when (val result = songRepository.deleteSong(songId)) {
                 is Resource.Success -> {
                     playbackStateManager.removeFromRecentlyPlayed(songId)
 
                     if (songId == currentSong.value?.id) {
-                        playbackStateManager.skipToNext()
+                        if (playbackStateManager.isPlayingFromQueue.value) {
+                            Log.d(
+                                    "LibraryViewModel",
+                                    "Deleted currently playing song '$songTitle' - skipping to next in queue"
+                            )
+                            playbackStateManager.skipToNext()
+                        } else {
+                            Log.d(
+                                    "LibraryViewModel",
+                                    "Deleted currently playing song '$songTitle' - stopping playback"
+                            )
+                            playbackStateManager.stopPlayback()
+                        }
+
+                        delay(300)
+
+                        playbackStateManager.refreshCurrentSongData()
                     }
 
                     refreshSongs()
-                    Log.d("LibraryViewModel", "Song deleted successfully.")
+                    Log.d("LibraryViewModel", "Song '$songTitle' deleted successfully.")
                 }
                 is Resource.Error -> {
-                    Log.e("LibraryViewModel", "Error deleting song: ${result.message}")
+                    Log.e("LibraryViewModel", "Error deleting song '$songTitle': ${result.message}")
                 }
                 is Resource.Loading -> {
-                    Log.d("LibraryViewModel", "Deleting song...")
+                    Log.d("LibraryViewModel", "Deleting song '$songTitle'...")
                 }
             }
         }
@@ -196,9 +215,16 @@ constructor(
     }
 
     fun hideEditDialog(refreshList: Boolean = false) {
+        val editedSongId = _state.value.songToEdit?.id
         _state.update { it.copy(showEditDialog = false, songToEdit = null) }
+
         if (refreshList) {
             refreshSongs()
+
+            if (editedSongId != null && editedSongId == currentSong.value?.id) {
+                Log.d("LibraryViewModel", "Edited currently playing song, refreshing player state")
+                playbackStateManager.refreshCurrentSongData()
+            }
         }
     }
 

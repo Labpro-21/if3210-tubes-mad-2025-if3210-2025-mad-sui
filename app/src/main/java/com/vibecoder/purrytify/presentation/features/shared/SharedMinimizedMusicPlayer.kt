@@ -16,6 +16,7 @@ fun SharedMinimizedMusicPlayer(
         onPlayerAreaClick: () -> Unit
 ) {
     var shouldShowPlayer by remember { mutableStateOf(true) }
+    var forceUpdate by remember { mutableStateOf(0) } /
 
     val song by playerViewModel.currentSong.collectAsStateWithLifecycle()
     val isPlaying by playerViewModel.isPlaying.collectAsStateWithLifecycle()
@@ -31,6 +32,12 @@ fun SharedMinimizedMusicPlayer(
                 is PlayerViewModel.UiEvent.HideMinimizedPlayer -> {
                     shouldShowPlayer = false
                 }
+                is PlayerViewModel.UiEvent.ShowSnackbar -> {
+                    if (event.message.contains("updated") || event.message.contains("edited")) {
+                        Log.d("SharedMinimizedPlayer", "Song updated, forcing UI refresh")
+                        forceUpdate++
+                    }
+                }
                 else -> {}
             }
         }
@@ -41,7 +48,9 @@ fun SharedMinimizedMusicPlayer(
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
                 Lifecycle.Event.ON_RESUME -> {
+                    Log.d("SharedMinimizedPlayer", "Lifecycle resumed, refreshing player state")
                     playerViewModel.refreshPlayerState()
+                    forceUpdate++ // Increment to trigger recomposition on resume
                 }
                 else -> {}
             }
@@ -51,18 +60,24 @@ fun SharedMinimizedMusicPlayer(
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-    LaunchedEffect(song) { shouldShowPlayer = song != null }
+    LaunchedEffect(song) {
+        shouldShowPlayer = song != null
+        Log.d("SharedMinimizedPlayer", "Song changed, shouldShowPlayer = $shouldShowPlayer")
+    }
 
-    if (shouldShowPlayer && song != null) {
-        MinimizedMusicPlayer(
-                title = song!!.title,
-                artist = song!!.artist,
-                coverUrl = song!!.coverArtUri ?: "",
-                isPlaying = isPlaying,
-                isFavorite = isFavorite,
-                onPlayPauseClick = playerViewModel::togglePlayPause,
-                onFavoriteClick = playerViewModel::toggleFavorite,
-                onPlayerClick = onPlayerAreaClick
-        )
+    key(song?.id, forceUpdate) {
+        if (shouldShowPlayer && song != null) {
+            Log.d("SharedMinimizedPlayer", "Rendering player with song: ${song!!.title}")
+            MinimizedMusicPlayer(
+                    title = song!!.title,
+                    artist = song!!.artist,
+                    coverUrl = song!!.coverArtUri ?: "",
+                    isPlaying = isPlaying,
+                    isFavorite = isFavorite,
+                    onPlayPauseClick = playerViewModel::togglePlayPause,
+                    onFavoriteClick = playerViewModel::toggleFavorite,
+                    onPlayerClick = onPlayerAreaClick
+            )
+        }
     }
 }

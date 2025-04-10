@@ -123,14 +123,19 @@ constructor(
                             refreshQueueSongs()
 
                             Log.d("PlayerViewModel", "Player state refreshed after edit/delete")
+
+                            _uiEvents.emit(UiEvent.ShowSnackbar("Song updated"))
                         } else {
-                            // Song was deleted, handle appropriately
                             if (isPlayingFromQueue.value) {
                                 skipToNext()
                             } else {
-                                // Emit event to hide the player since song no longer exists
                                 _uiEvents.emit(UiEvent.HideMinimizedPlayer)
                                 _uiEvents.emit(UiEvent.CurrentSongDeleted)
+
+                                Log.d(
+                                        "PlayerViewModel",
+                                        "Current song no longer exists, hiding player"
+                                )
                             }
                         }
                     }
@@ -141,6 +146,7 @@ constructor(
                         )
                         // The song might have been deleted
                         _uiEvents.emit(UiEvent.ShowSnackbar("Unable to access current song data"))
+                        _uiEvents.emit(UiEvent.HideMinimizedPlayer)
                     }
                     else -> {}
                 }
@@ -295,14 +301,6 @@ constructor(
         return true
     }
 
-    /**
-     * Attempts to delete a song. Checks if the song is currently playing and prevents deletion if
-     * it is.
-     *
-     * @param songId ID of the song to delete
-     * @param forceDelete If true, will delete even if the song is currently playing
-     * @return True if deletion was attempted, false if prevented due to song being played
-     */
     fun deleteSong(songId: Long, forceDelete: Boolean = false): Boolean {
         val isCurrentlyPlaying = currentSong.value?.id == songId && isPlaying.value
 
