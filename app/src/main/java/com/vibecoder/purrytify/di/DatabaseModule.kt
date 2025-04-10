@@ -11,7 +11,6 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
 
-
 @Module
 @InstallIn(SingletonComponent::class)
 object DatabaseModule {
@@ -19,12 +18,9 @@ object DatabaseModule {
     @Provides
     @Singleton
     fun provideAppDatabase(@ApplicationContext context: Context): AppDatabase {
-        return Room.databaseBuilder(
-            context,
-            AppDatabase::class.java,
-            AppDatabase.DATABASE_NAME
-        ).fallbackToDestructiveMigration()
-            .build()
+        return Room.databaseBuilder(context, AppDatabase::class.java, AppDatabase.DATABASE_NAME)
+                .fallbackToDestructiveMigration()
+                .build()
     }
 
     @Provides
@@ -33,6 +29,4 @@ object DatabaseModule {
 
         return appDatabase.songDao()
     }
-
-
 }

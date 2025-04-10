@@ -16,7 +16,7 @@ fun SharedMinimizedMusicPlayer(
         onPlayerAreaClick: () -> Unit
 ) {
     var shouldShowPlayer by remember { mutableStateOf(true) }
-    var forceUpdate by remember { mutableStateOf(0) } /
+    var forceUpdate by remember { mutableStateOf(0) }
 
     val song by playerViewModel.currentSong.collectAsStateWithLifecycle()
     val isPlaying by playerViewModel.isPlaying.collectAsStateWithLifecycle()
