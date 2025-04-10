@@ -36,7 +36,7 @@ class SplashViewModel @Inject constructor(
 
                 _isAuthenticated.value = false
             } else {
-                when (val verifyResult = authRepository.verifyToken()) {
+                when (authRepository.verifyToken()) {
                     is Resource.Success -> {
 
                         _isAuthenticated.value = true
@@ -57,7 +57,7 @@ class SplashViewModel @Inject constructor(
 
         if (!refreshToken.isNullOrEmpty()) {
 
-            when (val refreshResult = authRepository.refreshToken()) {
+            when (authRepository.refreshToken()) {
                 is Resource.Success -> {
                     _isAuthenticated.value = true
                 }

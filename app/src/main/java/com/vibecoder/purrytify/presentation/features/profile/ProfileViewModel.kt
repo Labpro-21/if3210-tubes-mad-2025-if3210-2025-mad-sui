@@ -32,7 +32,7 @@ class ProfileViewModel @Inject constructor(
             _state.update { it.copy(isLoading = true, error = null) }
             when (val result = authRepository.getProfile()) {
                 is Resource.Success -> {
-                    result.data?.let { userDto ->
+                    result.data.let { userDto ->
                         _state.update {
                             it.copy(
                                 isLoading = false,

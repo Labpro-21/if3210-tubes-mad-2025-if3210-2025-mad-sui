@@ -9,27 +9,28 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.vibecoder.purrytify.data.local.model.SongEntity
 import com.vibecoder.purrytify.data.repository.SongRepository
+import com.vibecoder.purrytify.playback.PlaybackStateManager
 import com.vibecoder.purrytify.util.Resource
 import dagger.hilt.android.lifecycle.HiltViewModel
+import javax.inject.Inject
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
-import javax.inject.Inject
-
-
 
 data class SongBottomSheetState(
-    val title: String = "",
-    val artist: String = "",
-    val selectedAudioUri: Uri? = null,
-    val selectedCoverUri: Uri? = null,
-    val audioFileName: String? = null,
-    val coverFileName: String? = null,
-    val durationMs: Long? = null,
-    val isLoading: Boolean = false,
-    val error: String? = null
-    // TODO: Add fields for edit mode later
+        val id: Long = 0,
+        val title: String = "",
+        val artist: String = "",
+        val selectedAudioUri: Uri? = null,
+        val selectedCoverUri: Uri? = null,
+        val audioFileName: String? = null,
+        val coverFileName: String? = null,
+        val durationMs: Long? = null,
+        val isLoading: Boolean = false,
+        val error: String? = null,
+        val isEditMode: Boolean = false,
+        val originalFilePathUri: String? = null,
+        val originalCoverArtUri: String? = null
 )
-
 
 sealed class SheetEvent {
     object SaveSuccess : SheetEvent()
@@ -37,9 +38,12 @@ sealed class SheetEvent {
 }
 
 @HiltViewModel
-class SongBottomSheetViewModel @Inject constructor(
-    application: Application,
-    private val songRepository: SongRepository
+class SongBottomSheetViewModel
+@Inject
+constructor(
+        application: Application,
+        private val songRepository: SongRepository,
+        private val playbackStateManager: PlaybackStateManager
 ) : AndroidViewModel(application) {
 
     private val _state = MutableStateFlow(SongBottomSheetState())
@@ -60,11 +64,13 @@ class SongBottomSheetViewModel @Inject constructor(
         if (uri == null) return
 
         try {
-
             val contentResolver = getApplication<Application>().contentResolver
             val takeFlags = Intent.FLAG_GRANT_READ_URI_PERMISSION
             contentResolver.takePersistableUriPermission(uri, takeFlags)
-            Log.d("SongBottomSheetVM", "Successfully took persistable URI permission for audio: $uri")
+            Log.d(
+                    "SongBottomSheetVM",
+                    "Successfully took persistable URI permission for audio: $uri"
+            )
         } catch (e: SecurityException) {
             Log.e("SongBottomSheetVM", "Failed to take persistable URI permission", e)
             _state.update { it.copy(error = "Permission issue with audio file. Please try again.") }
@@ -82,22 +88,22 @@ class SongBottomSheetViewModel @Inject constructor(
             val contentResolver = getApplication<Application>().contentResolver
             val takeFlags = Intent.FLAG_GRANT_READ_URI_PERMISSION
             contentResolver.takePersistableUriPermission(uri, takeFlags)
-            Log.d("SongBottomSheetVM", "Successfully took persistable URI permission for cover: $uri")
+            Log.d(
+                    "SongBottomSheetVM",
+                    "Successfully took persistable URI permission for cover: $uri"
+            )
         } catch (e: SecurityException) {
             Log.e("SongBottomSheetVM", "Failed to take persistable URI permission for cover", e)
         }
 
-        _state.update { it.copy(
-            selectedCoverUri = uri,
-            coverFileName = getFileName(uri)
-        )}
+        _state.update { it.copy(selectedCoverUri = uri, coverFileName = getFileName(uri)) }
     }
 
     private fun extractMetadata(uri: Uri) {
         viewModelScope.launch {
-            var title: String? = null
-            var artist: String? = null
-            var duration: Long? = null
+            val title: String?
+            val artist: String?
+            val duration: Long?
             val fileName = getFileName(uri)
 
             try {
@@ -105,31 +111,47 @@ class SongBottomSheetViewModel @Inject constructor(
                 retriever.setDataSource(getApplication<Application>(), uri)
 
                 title = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE)
-                artist = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST)
-                    ?: retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ALBUMARTIST)
-                val durationStr = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
+                artist =
+                        retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST)
+                                ?: retriever.extractMetadata(
+                                        MediaMetadataRetriever.METADATA_KEY_ALBUMARTIST
+                                )
+                val durationStr =
+                        retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
                 duration = durationStr?.toLongOrNull()
 
                 retriever.release()
 
+                // Only update fields if in new song mode, or if they're empty
                 _state.update { currentState ->
                     currentState.copy(
-                        title = if (!title.isNullOrBlank() && currentState.title.isBlank()) title else currentState.title,
-                        artist = if (!artist.isNullOrBlank() && currentState.artist.isBlank()) artist else currentState.artist,
-                        durationMs = duration,
-                        audioFileName = fileName,
-                        isLoading = false,
-                        error = null
+                            title =
+                                    if (!currentState.isEditMode &&
+                                                    !title.isNullOrBlank() &&
+                                                    currentState.title.isBlank()
+                                    )
+                                            title
+                                    else currentState.title,
+                            artist =
+                                    if (!currentState.isEditMode &&
+                                                    !artist.isNullOrBlank() &&
+                                                    currentState.artist.isBlank()
+                                    )
+                                            artist
+                                    else currentState.artist,
+                            durationMs = duration,
+                            audioFileName = fileName,
+                            isLoading = false,
+                            error = null
                     )
                 }
-
             } catch (e: Exception) {
                 Log.e("SongBottomSheetVM", "Error extracting metadata", e)
                 _state.update { currentState ->
                     currentState.copy(
-                        isLoading = false,
-                        audioFileName = fileName,
-                        error = "Could not read metadata from audio file."
+                            isLoading = false,
+                            audioFileName = fileName,
+                            error = "Could not read metadata from audio file."
                     )
                 }
             }
@@ -137,17 +159,17 @@ class SongBottomSheetViewModel @Inject constructor(
     }
 
     private fun getFileName(uri: Uri): String? {
-
         return try {
-            getApplication<Application>().contentResolver
-                .query(uri, null, null, null, null)?.use { cursor ->
-                    if (cursor.moveToFirst()) {
-                        val nameIndex = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
-                        if (nameIndex != -1) cursor.getString(nameIndex) else "Selected File"
-                    } else {
-                        uri.lastPathSegment ?: "Selected File"
-                    }
+            getApplication<Application>().contentResolver.query(uri, null, null, null, null)?.use {
+                    cursor ->
+                if (cursor.moveToFirst()) {
+                    val nameIndex =
+                            cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                    if (nameIndex != -1) cursor.getString(nameIndex) else "Selected File"
+                } else {
+                    uri.lastPathSegment ?: "Selected File"
                 }
+            }
         } catch (e: Exception) {
             Log.w("SongBottomSheetVM", "Error getting file name", e)
             uri.lastPathSegment ?: "Selected File"
@@ -156,7 +178,9 @@ class SongBottomSheetViewModel @Inject constructor(
 
     fun saveSong() {
         val currentState = _state.value
-        if (currentState.selectedAudioUri == null) {
+
+        // Validation
+        if (!currentState.isEditMode && currentState.selectedAudioUri == null) {
             _state.update { it.copy(error = "Please select an audio file.") }
             return
         }
@@ -168,9 +192,11 @@ class SongBottomSheetViewModel @Inject constructor(
             _state.update { it.copy(error = "Please enter an artist.") }
             return
         }
-        if (currentState.durationMs == null || currentState.durationMs <= 0) {
+        if (!currentState.isEditMode &&
+                        (currentState.durationMs == null || currentState.durationMs <= 0)
+        ) {
             _state.update { it.copy(error = "Invalid or missing song duration.") }
-            if(currentState.selectedAudioUri != null && currentState.durationMs == null) {
+            if (currentState.durationMs == null && currentState.selectedAudioUri != null) {
                 extractMetadata(currentState.selectedAudioUri)
             }
             return
@@ -179,34 +205,91 @@ class SongBottomSheetViewModel @Inject constructor(
         // --- Prepare Song Data ---
         _state.update { it.copy(isLoading = true, error = null) }
 
-        val newSong = SongEntity(
-            title = currentState.title.trim(),
-            artist = currentState.artist.trim(),
-            filePathUri = currentState.selectedAudioUri.toString(),
-            coverArtUri = currentState.selectedCoverUri?.toString() ?: "",
-            duration = currentState.durationMs,
-            isLiked = false
-        )
-
-
         viewModelScope.launch {
-            when (val result = songRepository.addSong(newSong)) {
-                is Resource.Success -> {
-                    _state.update { it.copy(isLoading = false) }
-                    _eventFlow.emit(SheetEvent.SaveSuccess)
-                }
-                is Resource.Error -> {
-                    _state.update { it.copy(isLoading = false, error = result.message) }
+            if (currentState.isEditMode) {
+                // Update existing song
+                val updatedSong =
+                        SongEntity(
+                                id = currentState.id,
+                                title = currentState.title.trim(),
+                                artist = currentState.artist.trim(),
+                                filePathUri = currentState.selectedAudioUri?.toString()
+                                                ?: currentState.originalFilePathUri ?: "",
+                                coverArtUri = currentState.selectedCoverUri?.toString()
+                                                ?: currentState.originalCoverArtUri ?: "",
+                                duration = currentState.durationMs ?: 0L,
+                                isLiked = false
+                        )
 
+                when (val result = songRepository.updateSong(updatedSong)) {
+                    is Resource.Success -> {
+                        _state.update { it.copy(isLoading = false) }
+
+                        playbackStateManager.refreshRecentlyPlayed(delayMs = 300)
+
+                        _eventFlow.emit(SheetEvent.SaveSuccess)
+                    }
+                    is Resource.Error -> {
+                        _state.update { it.copy(isLoading = false, error = result.message) }
+                    }
+                    is Resource.Loading -> {}
                 }
-                is Resource.Loading -> {  }
+            } else {
+                // Add new song
+                val newSong =
+                        SongEntity(
+                                title = currentState.title.trim(),
+                                artist = currentState.artist.trim(),
+                                filePathUri = currentState.selectedAudioUri.toString(),
+                                coverArtUri = currentState.selectedCoverUri?.toString() ?: "",
+                                duration = currentState.durationMs ?: 0L,
+                                isLiked = false
+                        )
+
+                when (val result = songRepository.addSong(newSong)) {
+                    is Resource.Success -> {
+                        _state.update { it.copy(isLoading = false) }
+                        _eventFlow.emit(SheetEvent.SaveSuccess)
+                    }
+                    is Resource.Error -> {
+                        _state.update { it.copy(isLoading = false, error = result.message) }
+                    }
+                    is Resource.Loading -> {}
+                }
             }
+        }
+    }
+
+    fun setEditMode(song: SongEntity) {
+        try {
+            val audioUri = if (song.filePathUri.isNotEmpty()) Uri.parse(song.filePathUri) else null
+            val coverUri =
+                    if (!song.coverArtUri.isNullOrEmpty()) Uri.parse(song.coverArtUri) else null
+
+            _state.update {
+                it.copy(
+                        id = song.id,
+                        title = song.title,
+                        artist = song.artist,
+                        durationMs = song.duration,
+                        originalFilePathUri = song.filePathUri,
+                        originalCoverArtUri = song.coverArtUri,
+                        audioFileName = audioUri?.lastPathSegment,
+                        coverFileName = coverUri?.lastPathSegment,
+                        isEditMode = true
+                )
+            }
+
+            Log.d("SongBottomSheetVM", "Edit mode set for song: ${song.title}")
+        } catch (e: Exception) {
+            Log.e("SongBottomSheetVM", "Error setting edit mode", e)
+            _state.update { it.copy(error = "Error loading song data: ${e.localizedMessage}") }
         }
     }
 
     fun dismiss() {
         viewModelScope.launch {
-             _state.value = SongBottomSheetState()
+            _state.value = SongBottomSheetState()
             _eventFlow.emit(SheetEvent.Dismiss)
         }
     }

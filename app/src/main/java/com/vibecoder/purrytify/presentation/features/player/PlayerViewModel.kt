@@ -6,19 +6,21 @@ import androidx.lifecycle.viewModelScope
 import com.vibecoder.purrytify.data.local.model.SongEntity
 import com.vibecoder.purrytify.data.repository.SongRepository
 import com.vibecoder.purrytify.playback.PlaybackStateManager
+import com.vibecoder.purrytify.playback.RepeatMode
+import com.vibecoder.purrytify.playback.ShuffleMode
 import com.vibecoder.purrytify.util.Resource
 import dagger.hilt.android.lifecycle.HiltViewModel
+import javax.inject.Inject
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
-import javax.inject.Inject
 
 @HiltViewModel
-class PlayerViewModel @Inject constructor(
-    private val playbackStateManager: PlaybackStateManager,
-    private val songRepository: SongRepository
+class PlayerViewModel
+@Inject
+constructor(
+        private val playbackStateManager: PlaybackStateManager,
+        private val songRepository: SongRepository
 ) : ViewModel() {
-
-
 
     val currentSong: StateFlow<SongEntity?> = playbackStateManager.currentSong
     val isPlaying: StateFlow<Boolean> = playbackStateManager.isPlaying
@@ -26,17 +28,90 @@ class PlayerViewModel @Inject constructor(
     val currentPositionMs: StateFlow<Long> = playbackStateManager.currentPositionMs
     val totalDurationMs: StateFlow<Long> = playbackStateManager.totalDurationMs
     val playerError: StateFlow<String?> = playbackStateManager.error
+    val queue = playbackStateManager.queue
+    val repeatMode = playbackStateManager.repeatMode
+    val shuffleMode = playbackStateManager.shuffleMode
+    val canSkipNext = playbackStateManager.canSkipNext
+    val canSkipPrevious = playbackStateManager.canSkipPrevious
+    val currentQueueIndex = playbackStateManager.currentQueueIndex
+    val isPlayingFromQueue = playbackStateManager.isPlayingFromQueue
 
-    val isFavorite: StateFlow<Boolean> = currentSong
-        .map { song -> song?.isLiked ?: false }
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000L),
-            initialValue = false
-        )
+    private val _songToEditFlow = MutableSharedFlow<SongEntity>()
+    val songToEditFlow: SharedFlow<SongEntity> = _songToEditFlow.asSharedFlow()
 
+    fun requestEditSong(song: SongEntity) {
+        viewModelScope.launch { _songToEditFlow.emit(song) }
+    }
 
-    private val _uiEvents = MutableSharedFlow<UiEvent>()
+    fun deleteSong(songId: Long) {
+        viewModelScope.launch {
+            when (val result = songRepository.deleteSong(songId)) {
+                is Resource.Success -> {
+                    // Remove from queue if in queue
+                    if (isInQueue(songId)) {
+                        removeFromQueue(
+                                SongEntity(
+                                        id = songId,
+                                        title = "",
+                                        artist = "",
+                                        filePathUri = "",
+                                        coverArtUri = null,
+                                        duration = 0
+                                )
+                        )
+                    }
+
+                    // Remove from recently played
+                    playbackStateManager.removeFromRecentlyPlayed(songId)
+
+                    if (currentSong.value?.id == songId) {
+                        skipToNext()
+                    }
+
+                    _uiEvents.emit(UiEvent.ShowSnackbar("Song deleted successfully"))
+                }
+                is Resource.Error -> {
+                    _uiEvents.emit(UiEvent.ShowSnackbar("Failed to delete song: ${result.message}"))
+                }
+                is Resource.Loading -> {}
+            }
+        }
+    }
+
+    // Queue songs for display
+    private val _queueSongs = MutableStateFlow<List<SongEntity>>(emptyList())
+    val queueSongs: StateFlow<List<SongEntity>> = _queueSongs.asStateFlow()
+
+    val isShuffleOn =
+            shuffleMode
+                    .map { it == ShuffleMode.ON }
+                    .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+
+    val repeatModeIcon =
+            repeatMode
+                    .map { mode ->
+                        when (mode) {
+                            RepeatMode.NONE -> RepeatModeIcon.NONE
+                            RepeatMode.ALL -> RepeatModeIcon.ALL
+                            RepeatMode.ONE -> RepeatModeIcon.ONE
+                        }
+                    }
+                    .stateIn(
+                            viewModelScope,
+                            SharingStarted.WhileSubscribed(5000),
+                            RepeatModeIcon.NONE
+                    )
+
+    val isFavorite: StateFlow<Boolean> =
+            currentSong
+                    .map { song -> song?.isLiked ?: false }
+                    .stateIn(
+                            scope = viewModelScope,
+                            started = SharingStarted.WhileSubscribed(5000L),
+                            initialValue = false
+                    )
+
+    val _uiEvents = MutableSharedFlow<UiEvent>()
     val uiEvents: SharedFlow<UiEvent> = _uiEvents.asSharedFlow()
 
     sealed class UiEvent {
@@ -44,7 +119,27 @@ class PlayerViewModel @Inject constructor(
         object NavigateToFullScreenPlayer : UiEvent()
     }
 
+    enum class RepeatModeIcon {
+        NONE,
+        ALL,
+        ONE
+    }
 
+    enum class SongStatus {
+        CURRENTLY_PLAYING,
+        IN_QUEUE,
+        NOT_IN_QUEUE
+    }
+
+    init {
+        refreshQueueSongs()
+
+        viewModelScope.launch { queue.collect { refreshQueueSongs() } }
+    }
+
+    private fun refreshQueueSongs() {
+        playbackStateManager.getQueueSongs { songs -> _queueSongs.value = songs }
+    }
 
     fun togglePlayPause() {
         playbackStateManager.playPause()
@@ -62,35 +157,99 @@ class PlayerViewModel @Inject constructor(
         playbackStateManager.skipToPrevious()
     }
 
+    fun playQueueItemAt(index: Int) {
+        if (index >= 0 && index < _queueSongs.value.size) {
+            playbackStateManager.playQueueItem(index)
+        }
+    }
+
+    fun toggleShuffle() {
+        playbackStateManager.toggleShuffleMode()
+    }
+
+    fun cycleRepeatMode() {
+        playbackStateManager.cycleRepeatMode()
+    }
+
+    // Add a song to the manual queue
+    fun addToQueue(song: SongEntity) {
+        if (isInQueue(song.id)) {
+            viewModelScope.launch { _uiEvents.emit(UiEvent.ShowSnackbar("Song already in queue")) }
+            return
+        }
+
+        playbackStateManager.addToQueue(song)
+        viewModelScope.launch {
+            _uiEvents.emit(UiEvent.ShowSnackbar("Added to queue: ${song.title}"))
+        }
+    }
+
+    fun removeFromQueue(song: SongEntity) {
+        playbackStateManager.removeFromQueue(song.id)
+        viewModelScope.launch {
+            _uiEvents.emit(UiEvent.ShowSnackbar("Removed from queue: ${song.title}"))
+        }
+    }
+
+    fun isInQueue(songId: Long): Boolean {
+        return playbackStateManager.isInQueue(songId)
+    }
+
+    fun checkSongStatus(song: SongEntity): SongStatus {
+        val currentSongId = currentSong.value?.id
+
+        if (song.id == currentSongId) {
+            return SongStatus.CURRENTLY_PLAYING
+        }
+
+        return if (isInQueue(song.id)) SongStatus.IN_QUEUE else SongStatus.NOT_IN_QUEUE
+    }
+
     fun toggleFavorite() {
         viewModelScope.launch {
             val songToToggle = currentSong.value
             if (songToToggle != null) {
                 val newLikedStatus = !songToToggle.isLiked
-                Log.d("PlayerViewModel", "Toggling favorite for song ${songToToggle.id} to $newLikedStatus")
-                when (val result = songRepository.updateLikeStatus(songToToggle.id, newLikedStatus)) {
+                Log.d(
+                        "PlayerViewModel",
+                        "Toggling favorite for song ${songToToggle.id} to $newLikedStatus"
+                )
+                when (val result = songRepository.updateLikeStatus(songToToggle.id, newLikedStatus)
+                ) {
                     is Resource.Success -> {
                         Log.d("PlayerViewModel", "DB update successful. Refreshing player state.")
                         playbackStateManager.refreshCurrentSongData()
                     }
                     is Resource.Error -> {
-                        Log.e("PlayerViewModel", "Failed to update favorite status in DB: ${result.message}")
+                        Log.e(
+                                "PlayerViewModel",
+                                "Failed to update favorite status in DB: ${result.message}"
+                        )
                         _uiEvents.emit(UiEvent.ShowSnackbar("Failed to update favorite status."))
                     }
-                    is Resource.Loading -> {  }
+                    is Resource.Loading -> {}
                 }
             } else {
                 Log.w("PlayerViewModel", "toggleFavorite called but currentSong is null.")
-                viewModelScope.launch { _uiEvents.emit(UiEvent.ShowSnackbar("No song playing to like.")) }
+                _uiEvents.emit(UiEvent.ShowSnackbar("No song playing to like."))
             }
         }
     }
 
-
     fun onPlayerClicked() {
         Log.d("PlayerViewModel", "Minimized Player clicked - Requesting navigation.")
-        viewModelScope.launch {
-            _uiEvents.emit(UiEvent.NavigateToFullScreenPlayer)
+        viewModelScope.launch { _uiEvents.emit(UiEvent.NavigateToFullScreenPlayer) }
+    }
+
+    // Toggle a song's queue status
+    fun toggleQueueStatus(song: SongEntity) {
+        val status = checkSongStatus(song)
+        when (status) {
+            SongStatus.IN_QUEUE -> removeFromQueue(song)
+            SongStatus.NOT_IN_QUEUE -> addToQueue(song)
+            SongStatus.CURRENTLY_PLAYING -> {
+                addToQueue(song)
+            }
         }
     }
 }

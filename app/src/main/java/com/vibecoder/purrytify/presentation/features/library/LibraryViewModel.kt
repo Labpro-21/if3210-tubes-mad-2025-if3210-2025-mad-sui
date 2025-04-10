@@ -1,42 +1,50 @@
 package com.vibecoder.purrytify.presentation.features.library
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.vibecoder.purrytify.data.repository.SongRepository
 import com.vibecoder.purrytify.data.local.model.SongEntity
+import com.vibecoder.purrytify.data.repository.SongRepository
+import com.vibecoder.purrytify.playback.PlaybackStateManager
 import com.vibecoder.purrytify.util.Resource
 import dagger.hilt.android.lifecycle.HiltViewModel
+import javax.inject.Inject
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
-import javax.inject.Inject
-import android.util.Log
-import com.vibecoder.purrytify.playback.PlaybackStateManager
-
 
 data class LibraryScreenState(
-    val songs: List<SongEntity> = emptyList(),
-    val isBottomSheetVisible: Boolean = false,
-    val selectedTab: Int = 0,
-    val isLoadingSongs: Boolean = true,
-    val libraryError: String? = null
+        val songs: List<SongEntity> = emptyList(),
+        val isBottomSheetVisible: Boolean = false,
+        val selectedTab: Int = 0,
+        val isLoadingSongs: Boolean = true,
+        val libraryError: String? = null,
+        val isContextMenuVisible: Boolean = false,
+        val searchQuery: String = "",
+        val originalSongs: List<SongEntity> = emptyList(),
+        val showEditDialog: Boolean = false,
+        val songToEdit: SongEntity? = null
 )
 
 @HiltViewModel
-class LibraryViewModel @Inject constructor(
-    private val songRepository: SongRepository,
-    private val playbackStateManager: PlaybackStateManager
+class LibraryViewModel
+@Inject
+constructor(
+        private val songRepository: SongRepository,
+        private val playbackStateManager: PlaybackStateManager
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(LibraryScreenState())
     val state: StateFlow<LibraryScreenState> = _state.asStateFlow()
 
-
     private val _selectedTab = MutableStateFlow(0)
 
-    private val currentSong = playbackStateManager.currentSong
+    val currentSong = playbackStateManager.currentSong
+    val isPlaying = playbackStateManager.isPlaying
 
     init {
-      // tab changes
+        initialize(this)
+
+        // Tab changes
         viewModelScope.launch {
             _selectedTab.collect { tabIndex ->
                 _state.update { it.copy(selectedTab = tabIndex, isLoadingSongs = true) }
@@ -44,10 +52,9 @@ class LibraryViewModel @Inject constructor(
             }
         }
 
-        // song changes (favorite/unfavorite)
+        // Song changes (favorite/unfavorite)
         viewModelScope.launch {
             currentSong.collect { song ->
-
                 if (song != null) {
                     refreshSongs()
                 }
@@ -55,21 +62,54 @@ class LibraryViewModel @Inject constructor(
         }
     }
 
+    fun setSearchQuery(query: String) {
+        // Update search query
+        _state.update { it.copy(searchQuery = query) }
+
+        // Filter songs based on the query
+        val filteredSongs =
+                if (query.isBlank()) {
+                    _state.value.originalSongs
+                } else {
+                    applySearchFilter(_state.value.originalSongs, query)
+                }
+
+        _state.update { it.copy(songs = filteredSongs) }
+    }
+
+    private fun applySearchFilter(songs: List<SongEntity>, query: String): List<SongEntity> {
+        if (query.isBlank()) return songs
+
+        return songs.filter {
+            it.title.contains(query, ignoreCase = true) ||
+                    it.artist.contains(query, ignoreCase = true)
+        }
+    }
+
     private fun loadSongsForCurrentTab() {
         viewModelScope.launch {
             try {
-                val songsFlow = when (_selectedTab.value) {
-                    0 -> songRepository.getAllSongs()
-                    1 -> songRepository.getLikedSongs()
-                    else -> flow { emit(emptyList<SongEntity>()) }
-                }
+                val songsFlow =
+                        when (_selectedTab.value) {
+                            0 -> songRepository.getAllSongs()
+                            1 -> songRepository.getLikedSongs()
+                            else -> flow { emit(emptyList<SongEntity>()) }
+                        }
 
-                songsFlow.collect { songs ->
+                songsFlow.collect { allSongs ->
+                    val filteredSongs =
+                            if (_state.value.searchQuery.isBlank()) {
+                                allSongs
+                            } else {
+                                applySearchFilter(allSongs, _state.value.searchQuery)
+                            }
+
                     _state.update {
                         it.copy(
-                            songs = songs,
-                            isLoadingSongs = false,
-                            libraryError = null
+                                songs = filteredSongs,
+                                originalSongs = allSongs,
+                                isLoadingSongs = false,
+                                libraryError = null
                         )
                     }
                 }
@@ -77,8 +117,8 @@ class LibraryViewModel @Inject constructor(
                 Log.e("LibraryVM", "Error loading songs", e)
                 _state.update {
                     it.copy(
-                        isLoadingSongs = false,
-                        libraryError = "Failed to load songs: ${e.localizedMessage}"
+                            isLoadingSongs = false,
+                            libraryError = "Failed to load songs: ${e.localizedMessage}"
                     )
                 }
             }
@@ -92,14 +132,52 @@ class LibraryViewModel @Inject constructor(
     }
 
     fun onPlaySong(song: SongEntity) {
-        playbackStateManager.playSong(song)
+        // Play song with current tab songs as queue
+        playbackStateManager.playSong(song, _state.value.originalSongs)
     }
 
+    fun togglePlayPause() {
+        playbackStateManager.playPause()
+    }
+
+    fun toggleFavoriteForSong(song: SongEntity) {
+        viewModelScope.launch {
+            val newLikedStatus = !song.isLiked
+            songRepository.updateLikeStatus(song.id, newLikedStatus)
+
+            if (song.id == currentSong.value?.id) {
+                playbackStateManager.refreshCurrentSongData()
+            }
+
+            refreshSongs()
+        }
+    }
+
+    fun deleteSong(songId: Long) {
+        viewModelScope.launch {
+            when (val result = songRepository.deleteSong(songId)) {
+                is Resource.Success -> {
+                    playbackStateManager.removeFromRecentlyPlayed(songId)
+
+                    if (songId == currentSong.value?.id) {
+                        playbackStateManager.skipToNext()
+                    }
+
+                    refreshSongs()
+                    Log.d("LibraryViewModel", "Song deleted successfully.")
+                }
+                is Resource.Error -> {
+                    Log.e("LibraryViewModel", "Error deleting song: ${result.message}")
+                }
+                is Resource.Loading -> {
+                    Log.d("LibraryViewModel", "Deleting song...")
+                }
+            }
+        }
+    }
 
     fun refreshSongs() {
-        viewModelScope.launch {
-            loadSongsForCurrentTab()
-        }
+        viewModelScope.launch { loadSongsForCurrentTab() }
     }
 
     fun showBottomSheet() {
@@ -110,6 +188,29 @@ class LibraryViewModel @Inject constructor(
         _state.update { it.copy(isBottomSheetVisible = false) }
         if (refreshList) {
             refreshSongs()
+        }
+    }
+
+    fun showEditDialog(song: SongEntity) {
+        _state.update { it.copy(showEditDialog = true, songToEdit = song) }
+    }
+
+    fun hideEditDialog(refreshList: Boolean = false) {
+        _state.update { it.copy(showEditDialog = false, songToEdit = null) }
+        if (refreshList) {
+            refreshSongs()
+        }
+    }
+
+    companion object {
+        private var instance: LibraryViewModel? = null
+
+        fun initialize(viewModel: LibraryViewModel) {
+            instance = viewModel
+        }
+
+        fun getInstance(): LibraryViewModel {
+            return instance ?: throw IllegalStateException("LibraryViewModel not initialized")
         }
     }
 }

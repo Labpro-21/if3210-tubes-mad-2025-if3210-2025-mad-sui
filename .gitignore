@@ -13,3 +13,6 @@
 .externalNativeBuild
 .cxx
 local.properties
+script.sh
+adb-sync
+out
