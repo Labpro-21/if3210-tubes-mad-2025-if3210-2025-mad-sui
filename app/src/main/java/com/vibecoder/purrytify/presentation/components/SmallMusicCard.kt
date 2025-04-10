@@ -90,16 +90,6 @@ fun SmallMusicCard(
                     maxLines = 1
             )
         }
-
-        // options menu button
-        IconButton(onClick = onMoreOptionsClick) {
-            Icon(
-                    imageVector = Icons.Default.MoreVert,
-                    contentDescription = "More Options",
-                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-            )
-        }
-
         // an icon to indicate the current song
         if (isCurrentSong && !isPlaying) {
             Icon(
@@ -107,6 +97,14 @@ fun SmallMusicCard(
                     contentDescription = "Current Song",
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.padding(end = 8.dp)
+            )
+        }
+        // options menu button
+        IconButton(onClick = onMoreOptionsClick) {
+            Icon(
+                    imageVector = Icons.Default.MoreVert,
+                    contentDescription = "More Options",
+                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
             )
         }
     }

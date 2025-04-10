@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.vibecoder.purrytify.data.local.model.SongEntity
 import com.vibecoder.purrytify.data.repository.SongRepository
 import com.vibecoder.purrytify.playback.PlaybackStateManager
+import com.vibecoder.purrytify.util.Resource
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.*
@@ -41,6 +42,8 @@ constructor(
     val isPlaying = playbackStateManager.isPlaying
 
     init {
+        initialize(this)
+
         // Tab changes
         viewModelScope.launch {
             _selectedTab.collect { tabIndex ->
@@ -152,8 +155,24 @@ constructor(
 
     fun deleteSong(songId: Long) {
         viewModelScope.launch {
-            songRepository.deleteSong(songId)
-            refreshSongs()
+            when (val result = songRepository.deleteSong(songId)) {
+                is Resource.Success -> {
+                    playbackStateManager.removeFromRecentlyPlayed(songId)
+
+                    if (songId == currentSong.value?.id) {
+                        playbackStateManager.skipToNext()
+                    }
+
+                    refreshSongs()
+                    Log.d("LibraryViewModel", "Song deleted successfully.")
+                }
+                is Resource.Error -> {
+                    Log.e("LibraryViewModel", "Error deleting song: ${result.message}")
+                }
+                is Resource.Loading -> {
+                    Log.d("LibraryViewModel", "Deleting song...")
+                }
+            }
         }
     }
 
@@ -176,7 +195,22 @@ constructor(
         _state.update { it.copy(showEditDialog = true, songToEdit = song) }
     }
 
-    fun hideEditDialog() {
+    fun hideEditDialog(refreshList: Boolean = false) {
         _state.update { it.copy(showEditDialog = false, songToEdit = null) }
+        if (refreshList) {
+            refreshSongs()
+        }
+    }
+
+    companion object {
+        private var instance: LibraryViewModel? = null
+
+        fun initialize(viewModel: LibraryViewModel) {
+            instance = viewModel
+        }
+
+        fun getInstance(): LibraryViewModel {
+            return instance ?: throw IllegalStateException("LibraryViewModel not initialized")
+        }
     }
 }

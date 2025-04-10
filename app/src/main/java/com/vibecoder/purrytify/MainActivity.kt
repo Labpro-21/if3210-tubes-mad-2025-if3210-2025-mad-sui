@@ -1,6 +1,7 @@
 package com.vibecoder.purrytify
 
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -21,9 +22,10 @@ import com.vibecoder.purrytify.presentation.components.NetworkAwareApp
 import com.vibecoder.purrytify.presentation.features.auth.LoginScreen
 import com.vibecoder.purrytify.presentation.features.home.HomeScreen
 import com.vibecoder.purrytify.presentation.features.library.LibraryScreen
-import com.vibecoder.purrytify.presentation.features.profile.ProfileScreen
+import com.vibecoder.purrytify.presentation.features.library.LibraryViewModel
 import com.vibecoder.purrytify.presentation.features.player.FullScreenPlayerScreen
 import com.vibecoder.purrytify.presentation.features.player.PlayerViewModel
+import com.vibecoder.purrytify.presentation.features.profile.ProfileScreen
 import com.vibecoder.purrytify.presentation.features.shared.SharedMinimizedMusicPlayer
 import com.vibecoder.purrytify.presentation.features.splash.SplashViewModel
 import com.vibecoder.purrytify.presentation.theme.PurrytifyTheme
@@ -39,11 +41,12 @@ object AppDestinations {
 }
 
 // login has no bottom bar
-val mainScaffoldRoutes = setOf(
-    AppDestinations.HOME_ROUTE,
-    AppDestinations.LIBRARY_ROUTE,
-    AppDestinations.PROFILE_ROUTE
-)
+val mainScaffoldRoutes =
+        setOf(
+                AppDestinations.HOME_ROUTE,
+                AppDestinations.LIBRARY_ROUTE,
+                AppDestinations.PROFILE_ROUTE
+        )
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -54,17 +57,11 @@ class MainActivity : ComponentActivity() {
         val splashScreen = installSplashScreen()
         super.onCreate(savedInstanceState)
 
-        splashScreen.setKeepOnScreenCondition {
-            splashViewModel.isAuthenticated.value == null
-        }
+        splashScreen.setKeepOnScreenCondition { splashViewModel.isAuthenticated.value == null }
 
         enableEdgeToEdge()
         setContent {
-            PurrytifyTheme {
-                NetworkAwareApp {
-                    PurritifyApp(splashViewModel = splashViewModel)
-                }
-            }
+            PurrytifyTheme { NetworkAwareApp { PurritifyApp(splashViewModel = splashViewModel) } }
         }
     }
 }
@@ -78,15 +75,16 @@ fun PurritifyApp(splashViewModel: SplashViewModel) {
     val isAuthenticated by splashViewModel.isAuthenticated.collectAsState()
 
     // after isAuthenticated is set, we can use it to determine the start destination
-    val startDestination by remember(isAuthenticated) {
-        derivedStateOf {
-            when (isAuthenticated) {
-                true -> AppDestinations.HOME_ROUTE
-                false -> AppDestinations.LOGIN_ROUTE
-                null -> AppDestinations.LOGIN_ROUTE
+    val startDestination by
+            remember(isAuthenticated) {
+                derivedStateOf {
+                    when (isAuthenticated) {
+                        true -> AppDestinations.HOME_ROUTE
+                        false -> AppDestinations.LOGIN_ROUTE
+                        null -> AppDestinations.LOGIN_ROUTE
+                    }
+                }
             }
-        }
-    }
 
     var showPlayerSheet by remember { mutableStateOf(false) }
     val playerSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -111,49 +109,60 @@ fun PurritifyApp(splashViewModel: SplashViewModel) {
         }
     }
 
+    LaunchedEffect(playerViewModel) {
+        playerViewModel.songToEditFlow.collect { song ->
+            navController.navigate(AppDestinations.LIBRARY_ROUTE) {
+                try {
+                    val libraryViewModel = LibraryViewModel.getInstance()
+                    libraryViewModel.showEditDialog(song)
+                } catch (e: Exception) {
+                    Log.e("MainActivity", "Error showing edit dialog: ${e.message}")
+                }
+            }
+        }
+    }
+
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
 
     val showMainScaffoldBottomBar = currentRoute in mainScaffoldRoutes
 
     Scaffold(
-        bottomBar = {
-            if (showMainScaffoldBottomBar) {
-                Column {
-                    if (shouldShowMiniPlayer) {
-                        SharedMinimizedMusicPlayer(
-                            onPlayerAreaClick = {
-                                playerViewModel.onPlayerClicked()
-                            }
-                        )
+            bottomBar = {
+                if (showMainScaffoldBottomBar) {
+                    Column {
+                        if (shouldShowMiniPlayer) {
+                            SharedMinimizedMusicPlayer(
+                                    onPlayerAreaClick = { playerViewModel.onPlayerClicked() }
+                            )
+                        }
+                        BottomNavigationBar(navController = navController)
                     }
-                    BottomNavigationBar(navController = navController)
                 }
             }
-        }
     ) { innerPadding ->
         AppNavHost(
-            navController = navController,
-            startDestination = startDestination,
-            modifier = Modifier.padding(innerPadding)
+                navController = navController,
+                startDestination = startDestination,
+                modifier = Modifier.padding(innerPadding)
         )
     }
 
     if (showPlayerSheet) {
         ModalBottomSheet(
-            onDismissRequest = { showPlayerSheet = false },
-            sheetState = playerSheetState,
-            dragHandle = null,
-            shape = RectangleShape,
+                onDismissRequest = { showPlayerSheet = false },
+                sheetState = playerSheetState,
+                dragHandle = null,
+                shape = RectangleShape,
         ) {
             FullScreenPlayerScreen(
-                playerViewModel = playerViewModel,
-                onCollapse = {
-                    scope.launch {
-                        playerSheetState.hide()
-                    }.invokeOnCompletion { if (!playerSheetState.isVisible) showPlayerSheet = false }
-                },
-                navController = navController
+                    playerViewModel = playerViewModel,
+                    onCollapse = {
+                        scope.launch { playerSheetState.hide() }.invokeOnCompletion {
+                            if (!playerSheetState.isVisible) showPlayerSheet = false
+                        }
+                    },
+                    navController = navController
             )
         }
     }
@@ -161,46 +170,38 @@ fun PurritifyApp(splashViewModel: SplashViewModel) {
 
 @Composable
 fun AppNavHost(
-    navController: NavHostController,
-    startDestination: String,
-    modifier: Modifier = Modifier
+        navController: NavHostController,
+        startDestination: String,
+        modifier: Modifier = Modifier
 ) {
     NavHost(
-        navController = navController,
-        startDestination = startDestination,
-        modifier = modifier,
+            navController = navController,
+            startDestination = startDestination,
+            modifier = modifier,
     ) {
         composable(AppDestinations.LOGIN_ROUTE) {
             LoginScreen(
-                onLoginSuccess = {
-                    navController.navigate(AppDestinations.HOME_ROUTE) {
-                        popUpTo(AppDestinations.LOGIN_ROUTE) { inclusive = true }
-                        launchSingleTop = true
+                    onLoginSuccess = {
+                        navController.navigate(AppDestinations.HOME_ROUTE) {
+                            popUpTo(AppDestinations.LOGIN_ROUTE) { inclusive = true }
+                            launchSingleTop = true
+                        }
                     }
-                }
             )
         }
 
-        composable(AppDestinations.HOME_ROUTE) {
-            HomeScreen()
-        }
+        composable(AppDestinations.HOME_ROUTE) { HomeScreen() }
 
-        composable(AppDestinations.LIBRARY_ROUTE) {
-            LibraryScreen()
-        }
+        composable(AppDestinations.LIBRARY_ROUTE) { LibraryScreen() }
 
-        composable(AppDestinations.PROFILE_ROUTE) {
-            ProfileScreen()
-        }
+        composable(AppDestinations.PROFILE_ROUTE) { ProfileScreen() }
 
         composable(AppDestinations.PLAYER_ROUTE) {
             val playerViewModel: PlayerViewModel = hiltViewModel()
             FullScreenPlayerScreen(
-                playerViewModel = playerViewModel,
-                onCollapse = {
-                    navController.navigateUp()
-                },
-                navController = navController
+                    playerViewModel = playerViewModel,
+                    onCollapse = { navController.navigateUp() },
+                    navController = navController
             )
         }
     }

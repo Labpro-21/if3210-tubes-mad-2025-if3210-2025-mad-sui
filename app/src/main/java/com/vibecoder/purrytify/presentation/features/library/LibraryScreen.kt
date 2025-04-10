@@ -241,16 +241,21 @@ fun LibraryScreen(
                 onToggleQueueClick = { playerViewModel.toggleQueueStatus(song) },
                 onToggleFavorite = { libraryViewModel.toggleFavoriteForSong(song) },
                 onDelete = { libraryViewModel.deleteSong(song.id) },
-                onEdit = {
-                    // TODO: Implement edit functionality
-                    libraryViewModel.showEditDialog(song)
-                }
+                onEdit = { libraryViewModel.showEditDialog(song) }
         )
     }
 
-    if (libraryState.isBottomSheetVisible) {
+    //  Add/Edit Song
+    if (libraryState.isBottomSheetVisible || libraryState.showEditDialog) {
         val bottomSheetViewModel: SongBottomSheetViewModel = hiltViewModel()
         val bottomSheetState by bottomSheetViewModel.state.collectAsStateWithLifecycle()
+
+        LaunchedEffect(libraryState.songToEdit) {
+            val song = libraryState.songToEdit
+            if (libraryState.showEditDialog && song != null) {
+                bottomSheetViewModel.setEditMode(song)
+            }
+        }
 
         // File picker contracts
         val audioPickerLauncher =
@@ -269,15 +274,32 @@ fun LibraryScreen(
             bottomSheetViewModel.eventFlow.collect { event ->
                 when (event) {
                     is SheetEvent.SaveSuccess ->
-                            libraryViewModel.hideBottomSheet(refreshList = true)
-                    is SheetEvent.Dismiss -> libraryViewModel.hideBottomSheet(refreshList = true)
+                            if (libraryState.showEditDialog) {
+                                libraryViewModel.hideEditDialog(refreshList = true)
+                            } else {
+                                libraryViewModel.hideBottomSheet(refreshList = true)
+                            }
+                    is SheetEvent.Dismiss ->
+                            if (libraryState.showEditDialog) {
+                                libraryViewModel.hideEditDialog(refreshList = false)
+                            } else {
+                                libraryViewModel.hideBottomSheet(refreshList = false)
+                            }
                 }
             }
         }
 
         SongBottomSheet(
                 isVisible = true,
-                onDismiss = bottomSheetViewModel::dismiss,
+                onDismiss = {
+                    if (libraryState.showEditDialog) {
+                        bottomSheetViewModel.dismiss()
+                        libraryViewModel.hideEditDialog()
+                    } else {
+                        bottomSheetViewModel.dismiss()
+                        libraryViewModel.hideBottomSheet()
+                    }
+                },
                 title = bottomSheetState.title,
                 artist = bottomSheetState.artist,
                 audioFileName = bottomSheetState.audioFileName,
@@ -285,6 +307,7 @@ fun LibraryScreen(
                 durationMillis = bottomSheetState.durationMs,
                 isLoading = bottomSheetState.isLoading,
                 error = bottomSheetState.error,
+                isEditMode = bottomSheetState.isEditMode,
                 onTitleChange = bottomSheetViewModel::updateTitle,
                 onArtistChange = bottomSheetViewModel::updateArtist,
                 onSave = bottomSheetViewModel::saveSong,

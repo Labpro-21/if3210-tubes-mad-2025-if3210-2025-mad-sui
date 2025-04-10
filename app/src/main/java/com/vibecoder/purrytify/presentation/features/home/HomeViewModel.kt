@@ -43,6 +43,8 @@ constructor(
                 _state.update { it.copy(recentlyPlayed = recentSongs) }
             }
         }
+
+        initialize(this)
     }
 
     private fun loadHomepageSongs() {
@@ -105,7 +107,12 @@ constructor(
         viewModelScope.launch {
             when (val result = songRepository.deleteSong(song.id)) {
                 is Resource.Success -> {
-                    // Refresh song lists
+                    playbackStateManager.removeFromRecentlyPlayed(song.id)
+
+                    if (song.id == currentSong.value?.id) {
+                        playbackStateManager.skipToNext()
+                    }
+
                     loadHomepageSongs()
                     Log.d("HomeViewModel", "Song deleted successfully.")
                 }
@@ -123,11 +130,26 @@ constructor(
         _state.update { it.copy(showEditDialog = true, songToEdit = song) }
     }
 
-    fun hideEditSongDialog() {
+    fun hideEditSongDialog(refreshList: Boolean = false) {
         _state.update { it.copy(showEditDialog = false, songToEdit = null) }
+        if (refreshList) {
+            refreshSongs()
+        }
     }
 
     fun refreshSongs() {
         loadHomepageSongs()
+    }
+
+    companion object {
+        private var instance: HomeViewModel? = null
+
+        fun initialize(viewModel: HomeViewModel) {
+            instance = viewModel
+        }
+
+        fun getInstance(): HomeViewModel {
+            return instance ?: throw IllegalStateException("HomeViewModel not initialized")
+        }
     }
 }

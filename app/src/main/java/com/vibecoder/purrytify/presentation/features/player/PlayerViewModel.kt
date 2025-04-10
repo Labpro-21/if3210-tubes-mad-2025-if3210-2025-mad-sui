@@ -36,6 +36,48 @@ constructor(
     val currentQueueIndex = playbackStateManager.currentQueueIndex
     val isPlayingFromQueue = playbackStateManager.isPlayingFromQueue
 
+    private val _songToEditFlow = MutableSharedFlow<SongEntity>()
+    val songToEditFlow: SharedFlow<SongEntity> = _songToEditFlow.asSharedFlow()
+
+    fun requestEditSong(song: SongEntity) {
+        viewModelScope.launch { _songToEditFlow.emit(song) }
+    }
+
+    fun deleteSong(songId: Long) {
+        viewModelScope.launch {
+            when (val result = songRepository.deleteSong(songId)) {
+                is Resource.Success -> {
+                    // Remove from queue if in queue
+                    if (isInQueue(songId)) {
+                        removeFromQueue(
+                                SongEntity(
+                                        id = songId,
+                                        title = "",
+                                        artist = "",
+                                        filePathUri = "",
+                                        coverArtUri = null,
+                                        duration = 0
+                                )
+                        )
+                    }
+
+                    // Remove from recently played
+                    playbackStateManager.removeFromRecentlyPlayed(songId)
+
+                    if (currentSong.value?.id == songId) {
+                        skipToNext()
+                    }
+
+                    _uiEvents.emit(UiEvent.ShowSnackbar("Song deleted successfully"))
+                }
+                is Resource.Error -> {
+                    _uiEvents.emit(UiEvent.ShowSnackbar("Failed to delete song: ${result.message}"))
+                }
+                is Resource.Loading -> {}
+            }
+        }
+    }
+
     // Queue songs for display
     private val _queueSongs = MutableStateFlow<List<SongEntity>>(emptyList())
     val queueSongs: StateFlow<List<SongEntity>> = _queueSongs.asStateFlow()
@@ -69,7 +111,7 @@ constructor(
                             initialValue = false
                     )
 
-    private val _uiEvents = MutableSharedFlow<UiEvent>()
+    val _uiEvents = MutableSharedFlow<UiEvent>()
     val uiEvents: SharedFlow<UiEvent> = _uiEvents.asSharedFlow()
 
     sealed class UiEvent {

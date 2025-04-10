@@ -89,6 +89,38 @@ constructor(
         updateNavigationState()
     }
 
+    fun removeFromRecentlyPlayed(songId: Long) {
+        _recentlyPlayed.update { currentList -> currentList.filterNot { it.id == songId }.toList() }
+        saveRecentlyPlayed()
+        Log.d(TAG, "Song $songId removed from recently played list")
+    }
+
+    fun refreshRecentlyPlayed(delayMs: Long = 0) {
+        if (_recentlyPlayed.value.isEmpty()) return
+
+        mainScope.launch {
+            // Apply delay if requested
+            if (delayMs > 0) {
+                delay(delayMs)
+            }
+
+            val currentIds = _recentlyPlayed.value.map { it.id }
+            val refreshedSongs = mutableListOf<SongEntity>()
+
+            for (id in currentIds) {
+                when (val result = songRepository.getSongById(id)) {
+                    is Resource.Success -> {
+                        result.data?.let { refreshedSongs.add(it) }
+                    }else -> {}
+                }
+            }
+
+            _recentlyPlayed.value = refreshedSongs
+            saveRecentlyPlayed()
+            Log.d(TAG, "Recently played list refreshed with ${refreshedSongs.size} songs")
+        }
+    }
+
     // Prev and next update state button
     private fun updateNavigationState() {
         // Using queue
