@@ -479,13 +479,10 @@ fun FullScreenPlayerScreen(
                         showOptionsMenu = false
                     },
                     onEdit = {
-                        // Try to request edit with safeguards
-                        val editAccepted =
-                                playerViewModel.requestEditSong(currentSong, collapsePlayer = false)
+                        playerViewModel.requestEditSong(currentSong, collapsePlayer = false)
                         showOptionsMenu = false
                     },
                     onDelete = {
-                        // Try to delete with safeguards
                         val deleteAccepted = playerViewModel.deleteSong(currentSong.id)
                         if (deleteAccepted) {
                             showOptionsMenu = false
@@ -495,7 +492,7 @@ fun FullScreenPlayerScreen(
                         }
                     },
                     isInQueue = currentSongIsInQueue,
-                    isPlaying = isPlaying // Add this parameter
+                    isPlaying = isPlaying
             )
         }
     }
