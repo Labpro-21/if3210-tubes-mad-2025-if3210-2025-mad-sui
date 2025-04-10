@@ -17,6 +17,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.*
+import com.vibecoder.purrytify.data.local.model.SongEntity
 import com.vibecoder.purrytify.presentation.components.BottomNavigationBar
 import com.vibecoder.purrytify.presentation.components.NetworkAwareApp
 import com.vibecoder.purrytify.presentation.features.auth.LoginScreen
@@ -105,19 +106,23 @@ fun PurritifyApp(splashViewModel: SplashViewModel) {
                 is PlayerViewModel.UiEvent.ShowSnackbar -> {
                     // TODO: Implement Snackbar
                 }
+                else -> {}
             }
         }
     }
 
     LaunchedEffect(playerViewModel) {
         playerViewModel.songToEditFlow.collect { song ->
-            navController.navigate(AppDestinations.LIBRARY_ROUTE) {
-                try {
-                    val libraryViewModel = LibraryViewModel.getInstance()
-                    libraryViewModel.showEditDialog(song)
-                } catch (e: Exception) {
-                    Log.e("MainActivity", "Error showing edit dialog: ${e.message}")
+            // edit with collapse requested
+            if (showPlayerSheet) {
+                scope.launch { playerSheetState.hide() }.invokeOnCompletion {
+                    if (!playerSheetState.isVisible) {
+                        showPlayerSheet = false
+                        navigateToLibraryForEdit(navController, song)
+                    }
                 }
+            } else {
+                navigateToLibraryForEdit(navController, song)
             }
         }
     }
@@ -164,6 +169,17 @@ fun PurritifyApp(splashViewModel: SplashViewModel) {
                     },
                     navController = navController
             )
+        }
+    }
+}
+
+private fun navigateToLibraryForEdit(navController: NavHostController, song: SongEntity) {
+    navController.navigate(AppDestinations.LIBRARY_ROUTE) {
+        try {
+            val libraryViewModel = LibraryViewModel.getInstance()
+            libraryViewModel.showEditDialog(song)
+        } catch (e: Exception) {
+            Log.e("MainActivity", "Error showing edit dialog: ${e.message}")
         }
     }
 }

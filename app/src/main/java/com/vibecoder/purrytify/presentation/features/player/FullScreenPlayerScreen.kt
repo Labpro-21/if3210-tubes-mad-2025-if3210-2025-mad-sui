@@ -1,6 +1,11 @@
 package com.vibecoder.purrytify.presentation.features.player
 
+import android.Manifest
 import android.graphics.drawable.BitmapDrawable
+import android.net.Uri
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -27,17 +32,25 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.palette.graphics.Palette
 import coil.ImageLoader
 import coil.compose.rememberAsyncImagePainter
 import coil.request.ImageRequest
 import coil.request.SuccessResult
+import com.google.accompanist.permissions.ExperimentalPermissionsApi
+import com.google.accompanist.permissions.isGranted
+import com.google.accompanist.permissions.rememberPermissionState
 import com.vibecoder.purrytify.R
+import com.vibecoder.purrytify.data.local.model.SongEntity
+import com.vibecoder.purrytify.presentation.components.SongBottomSheet
+import com.vibecoder.purrytify.presentation.features.library.SheetEvent
+import com.vibecoder.purrytify.presentation.features.library.SongBottomSheetViewModel
 import com.vibecoder.purrytify.presentation.theme.Black
 import java.util.concurrent.TimeUnit
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalPermissionsApi::class)
 @Composable
 fun FullScreenPlayerScreen(
         playerViewModel: PlayerViewModel,
@@ -57,6 +70,23 @@ fun FullScreenPlayerScreen(
     var showOptionsMenu by remember { mutableStateOf(false) }
     val currentSongIsInQueue =
             remember(song) { song?.let { playerViewModel.isInQueue(it.id) } ?: false }
+
+    //  states for edit dialog
+    var showEditSongDialog by remember { mutableStateOf(false) }
+    var songToEdit by remember { mutableStateOf<SongEntity?>(null) }
+
+    LaunchedEffect(playerViewModel) {
+        playerViewModel.uiEvents.collect { event ->
+            when (event) {
+                is PlayerViewModel.UiEvent.ShowEditDialog -> {
+                    songToEdit = event.song
+                    showEditSongDialog = true
+                }
+                is PlayerViewModel.UiEvent.ShowSnackbar -> {}
+                else -> {}
+            }
+        }
+    }
 
     var dominantColor by remember { mutableStateOf(Color(0xFF550A1C)) }
     val context = LocalContext.current
@@ -449,16 +479,23 @@ fun FullScreenPlayerScreen(
                         showOptionsMenu = false
                     },
                     onEdit = {
-                        playerViewModel.requestEditSong(currentSong)
+                        // Try to request edit with safeguards
+                        val editAccepted =
+                                playerViewModel.requestEditSong(currentSong, collapsePlayer = false)
                         showOptionsMenu = false
-                        onCollapse()
                     },
                     onDelete = {
-                        playerViewModel.deleteSong(currentSong.id)
-                        showOptionsMenu = false
-                        onCollapse()
+                        // Try to delete with safeguards
+                        val deleteAccepted = playerViewModel.deleteSong(currentSong.id)
+                        if (deleteAccepted) {
+                            showOptionsMenu = false
+                            onCollapse()
+                        } else {
+                            showOptionsMenu = false
+                        }
                     },
-                    isInQueue = currentSongIsInQueue
+                    isInQueue = currentSongIsInQueue,
+                    isPlaying = isPlaying // Add this parameter
             )
         }
     }
@@ -466,6 +503,79 @@ fun FullScreenPlayerScreen(
     // Queue Dialog
     if (showQueueDialog) {
         QueueDialog(viewModel = playerViewModel, onDismiss = { showQueueDialog = false })
+    }
+
+    // Edit dialog
+    if (showEditSongDialog && songToEdit != null) {
+        val editViewModel: SongBottomSheetViewModel = hiltViewModel()
+        val editState by editViewModel.state.collectAsStateWithLifecycle()
+
+        // Set edit mode for the song
+        LaunchedEffect(songToEdit) { songToEdit?.let { editViewModel.setEditMode(it) } }
+
+        // File picker contracts
+        val audioPickerLauncher =
+                rememberLauncherForActivityResult(
+                        contract = ActivityResultContracts.OpenDocument(),
+                        onResult = { uri: Uri? -> uri?.let { editViewModel.setAudioFileUri(it) } }
+                )
+
+        val imagePickerLauncher =
+                rememberLauncherForActivityResult(
+                        contract = ActivityResultContracts.OpenDocument(),
+                        onResult = { uri: Uri? -> uri?.let { editViewModel.setCoverImageUri(it) } }
+                )
+
+        // Observe events from the edit view model
+        LaunchedEffect(Unit) {
+            editViewModel.eventFlow.collect { event ->
+                when (event) {
+                    is SheetEvent.SaveSuccess -> {
+                        showEditSongDialog = false
+                        playerViewModel.refreshPlayerState()
+                    }
+                    is SheetEvent.Dismiss -> {
+                        showEditSongDialog = false
+                    }
+                }
+            }
+        }
+
+        // Permission state for file access
+        val permission =
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    Manifest.permission.READ_MEDIA_AUDIO
+                } else {
+                    Manifest.permission.READ_EXTERNAL_STORAGE
+                }
+        val permissionState = rememberPermissionState(permission)
+
+        SongBottomSheet(
+                isVisible = true,
+                onDismiss = {
+                    editViewModel.dismiss()
+                    showEditSongDialog = false
+                },
+                title = editState.title,
+                artist = editState.artist,
+                audioFileName = editState.audioFileName,
+                coverFileName = editState.coverFileName,
+                durationMillis = editState.durationMs,
+                isLoading = editState.isLoading,
+                error = editState.error,
+                isEditMode = editState.isEditMode,
+                onTitleChange = editViewModel::updateTitle,
+                onArtistChange = editViewModel::updateArtist,
+                onSave = editViewModel::saveSong,
+                onAudioSelect = {
+                    if (permissionState.status.isGranted) {
+                        audioPickerLauncher.launch(arrayOf("audio/*"))
+                    } else {
+                        permissionState.launchPermissionRequest()
+                    }
+                },
+                onCoverSelect = { imagePickerLauncher.launch(arrayOf("image/*")) }
+        )
     }
 }
 

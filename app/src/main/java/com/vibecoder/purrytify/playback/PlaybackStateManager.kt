@@ -111,7 +111,8 @@ constructor(
                 when (val result = songRepository.getSongById(id)) {
                     is Resource.Success -> {
                         result.data?.let { refreshedSongs.add(it) }
-                    }else -> {}
+                    }
+                    else -> {}
                 }
             }
 
@@ -829,9 +830,23 @@ constructor(
         }
     }
 
+    /** Stop playback and clear the current song */
+    fun stopPlayback() {
+        mediaController?.stop()
+        mediaController?.clearMediaItems()
+        _currentSong.value = null
+        _isPlaying.value = false
+        _playbackState.value = Player.STATE_IDLE
+        _currentPositionMs.value = 0L
+        _totalDurationMs.value = 0L
+        _currentQueueIndex.value = -1
+        _isPlayingFromQueue.value = false
+        _canSkipNext.value = false
+        _canSkipPrevious.value = false
+    }
+
     /** Releases the media controller */
     fun releaseController() {
-        Log.d(TAG, "Releasing MediaController.")
         stopPositionUpdates()
         mediaController?.removeListener(playerListener)
         mediaControllerFuture?.let { future -> MediaController.releaseFuture(future) }

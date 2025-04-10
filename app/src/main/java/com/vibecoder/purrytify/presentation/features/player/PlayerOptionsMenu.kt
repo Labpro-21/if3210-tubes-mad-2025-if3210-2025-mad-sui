@@ -27,7 +27,8 @@ fun PlayerOptionsMenu(
         onRemoveFromQueue: () -> Unit,
         onEdit: () -> Unit,
         onDelete: () -> Unit,
-        isInQueue: Boolean
+        isInQueue: Boolean,
+        isPlaying: Boolean = false
 ) {
     if (isOpen) {
         Dialog(onDismissRequest = onDismiss) {
@@ -95,11 +96,14 @@ fun PlayerOptionsMenu(
                     }
 
                     // Edit option
+                    val editEnabled = !isPlaying
                     Row(
                             modifier =
                                     Modifier.fillMaxWidth()
-                                            .clickable {
-                                                onEdit()
+                                            .clickable(enabled = editEnabled) {
+                                                if (editEnabled) {
+                                                    onEdit()
+                                                }
                                                 onDismiss()
                                             }
                                             .padding(vertical = 12.dp, horizontal = 16.dp),
@@ -108,16 +112,18 @@ fun PlayerOptionsMenu(
                         Icon(
                                 imageVector = Icons.Default.Edit,
                                 contentDescription = "Edit Song",
-                                tint = Color.White,
+                                tint = if (editEnabled) Color.White else Color.Gray,
                                 modifier = Modifier.size(24.dp)
                         )
 
                         Spacer(modifier = Modifier.width(16.dp))
 
                         Text(
-                                text = "Edit Song",
+                                text =
+                                        if (editEnabled) "Edit Song"
+                                        else "Cannot Edit (Currently Playing)",
                                 style = MaterialTheme.typography.bodyLarge,
-                                color = Color.White
+                                color = if (editEnabled) Color.White else Color.Gray
                         )
                     }
 
@@ -125,8 +131,10 @@ fun PlayerOptionsMenu(
                     Row(
                             modifier =
                                     Modifier.fillMaxWidth()
-                                            .clickable {
-                                                onDelete()
+                                            .clickable(enabled = !isPlaying) {
+                                                if (!isPlaying) {
+                                                    onDelete()
+                                                }
                                                 onDismiss()
                                             }
                                             .padding(vertical = 12.dp, horizontal = 16.dp),
@@ -135,16 +143,18 @@ fun PlayerOptionsMenu(
                         Icon(
                                 imageVector = Icons.Default.Delete,
                                 contentDescription = "Delete Song",
-                                tint = Color.Red,
+                                tint = if (isPlaying) Color.Gray else Color.Red,
                                 modifier = Modifier.size(24.dp)
                         )
 
                         Spacer(modifier = Modifier.width(16.dp))
 
                         Text(
-                                text = "Delete Song",
+                                text =
+                                        if (isPlaying) "Cannot Delete (Currently Playing)"
+                                        else "Delete Song",
                                 style = MaterialTheme.typography.bodyLarge,
-                                color = Color.Red
+                                color = if (isPlaying) Color.Gray else Color.Red
                         )
                     }
                 }
