@@ -34,6 +34,10 @@
                 <action android:name="android.intent.action.MEDIA_BUTTON" />
             </intent-filter>
         </receiver>
+        <service
+            android:name=".tokenrefresh.TokenRefreshService"
+            android:enabled="true"
+            android:exported="false"/>
         <activity
             android:name=".MainActivity"
             android:exported="true"

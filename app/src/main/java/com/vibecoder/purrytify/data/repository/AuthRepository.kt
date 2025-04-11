@@ -1,12 +1,16 @@
 package com.vibecoder.purrytify.data.repository
 
+import android.content.Context
+import android.content.Intent
 import com.vibecoder.purrytify.data.remote.PurrytifyApi
 import com.vibecoder.purrytify.data.remote.dto.LoginRequest
 import com.vibecoder.purrytify.data.remote.dto.RefreshTokenRequest
 import com.vibecoder.purrytify.data.remote.dto.UserDto
+import com.vibecoder.purrytify.tokenrefresh.TokenRefreshService
 
 import com.vibecoder.purrytify.util.Resource
 import com.vibecoder.purrytify.util.TokenManager
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.first
 import retrofit2.HttpException
 import java.io.IOException
@@ -15,6 +19,7 @@ import javax.inject.Singleton
 
 @Singleton
 class AuthRepository @Inject constructor(
+    @ApplicationContext private val context: Context,
     private val api: PurrytifyApi,
     private val tokenManager: TokenManager
 )  {
@@ -24,6 +29,7 @@ class AuthRepository @Inject constructor(
             val response = api.login(LoginRequest(email, password))
             tokenManager.saveToken(response.accessToken)
             tokenManager.saveRefreshToken(response.refreshToken)
+            startTokenRefreshService()
             Resource.Success(Unit)
         } catch (e: HttpException) {
             Resource.Error(message = "Invalid credentials or server error.")
@@ -35,7 +41,7 @@ class AuthRepository @Inject constructor(
     }
 
     suspend fun logout() {
-
+        stopTokenRefreshService()
         tokenManager.deleteToken()
         tokenManager.deleteRefreshToken()
     }
@@ -98,5 +104,14 @@ class AuthRepository @Inject constructor(
         } catch (e: Exception) {
             Resource.Error("Failed to verify token: Unexpected error.")
         }
+    }
+    private fun startTokenRefreshService(){
+        val intent = Intent(context, TokenRefreshService::class.java)
+        context.startService(intent)
+    }
+
+    private  fun stopTokenRefreshService(){
+        val intent = Intent(context, TokenRefreshService::class.java)
+        context.stopService(intent)
     }
 }
