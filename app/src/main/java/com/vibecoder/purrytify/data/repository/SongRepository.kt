@@ -189,5 +189,6 @@ class SongRepository @Inject constructor(private val songDao: SongDao) {
         // OWASP M4
         private const val MAX_ARTIST_LENGTH = 100
         private const val MAX_SONG_DURATION_MS = 30 * 60 * 1000L // 30 minutes
+        private const val MAX_TITLE_LENGTH = 100
     }
 }
