@@ -156,7 +156,10 @@ fun HomeScreen(
     }
 
     // Context Menu
-    selectedSong?.let { song ->
+    selectedSong?.let { songg ->
+        val song = state.newSongs.find { it.id == songg.id } 
+        ?: state.recentlyPlayed.find { it.id == songg.id }
+        ?: songg
         SongContextMenu(
             song = song,
             isOpen = showContextMenu,
