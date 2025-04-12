@@ -12,12 +12,12 @@ import com.vibecoder.purrytify.R
 import com.vibecoder.purrytify.data.local.model.SongEntity
 
 class SongAdapter(
-    private var songs: List<SongEntity>,
-    private var currentSongId: Long = -1,
-    private var isPlaying: Boolean = false,
-    private val onItemClick: (SongEntity) -> Unit,
-    private val onPlayPauseClick: (SongEntity) -> Unit,
-    private val onMoreOptionsClick: (SongEntity) -> Unit
+        private var songs: List<SongEntity>,
+        private var currentSongId: Long = -1,
+        private var isPlaying: Boolean = false,
+        private val onItemClick: (SongEntity) -> Unit,
+        private val onPlayPauseClick: (SongEntity) -> Unit,
+        private val onMoreOptionsClick: (SongEntity) -> Unit
 ) : RecyclerView.Adapter<SongAdapter.SongViewHolder>() {
 
     inner class SongViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
@@ -42,10 +42,10 @@ class SongAdapter(
 
             // Update play/pause button icon
             playPauseButton.setImageResource(
-                when {
-                    isSongPlaying -> R.drawable.ic_pause
-                    else -> R.drawable.ic_play
-                }
+                    when {
+                        isSongPlaying -> R.drawable.ic_pause
+                        else -> R.drawable.ic_play
+                    }
             )
 
             // Set click listeners

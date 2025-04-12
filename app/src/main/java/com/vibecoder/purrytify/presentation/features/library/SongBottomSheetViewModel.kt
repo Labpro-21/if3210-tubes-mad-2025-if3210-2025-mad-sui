@@ -195,7 +195,7 @@ constructor(
             return
         }
         if (!currentState.isEditMode &&
-                        (currentState.durationMs == null || currentState.durationMs <= 0)
+            (currentState.durationMs == null || currentState.durationMs <= 0)
         ) {
             _state.update { it.copy(error = "Invalid or missing song duration.") }
             if (currentState.durationMs == null && currentState.selectedAudioUri != null) {
@@ -209,34 +209,51 @@ constructor(
 
         viewModelScope.launch {
             if (currentState.isEditMode) {
+                // Check if audio file is being changed
+                val isAudioChanged = currentState.selectedAudioUri != null
+
                 // Update existing song
                 val updatedSong =
-                        UpdateSongRequest(
-                                id = currentState.id,
-                                title = currentState.title.trim(),
-                                artist = currentState.artist.trim(),
-                                filePathUri = currentState.selectedAudioUri?.toString()
-                                                ?: currentState.originalFilePathUri ?: "",
-                                coverArtUri = currentState.selectedCoverUri?.toString()
-                                                ?: currentState.originalCoverArtUri ?: "",
-                                duration = currentState.durationMs ?: 0L,
-                                isLiked = false
-                        )
+                    UpdateSongRequest(
+                        id = currentState.id,
+                        title = currentState.title.trim(),
+                        artist = currentState.artist.trim(),
+                        filePathUri = currentState.selectedAudioUri?.toString()
+                            ?: currentState.originalFilePathUri ?: "",
+                        coverArtUri = currentState.selectedCoverUri?.toString()
+                            ?: currentState.originalCoverArtUri ?: "",
+                        duration = currentState.durationMs ?: 0L,
+                        isLiked = false
+                    )
 
                 when (val result = songRepository.updateSong(updatedSong)) {
                     is Resource.Success -> {
                         _state.update { it.copy(isLoading = false) }
+
+                        // If we changed the audio file and this is the currently playing song,
+                        // we need to reload the audio in the player
+                        if (isAudioChanged) {
+                            Log.d("SongBottomSheetVM", "Audio file changed, reloading player")
+                            val currentPlayingSong = playbackStateManager.currentSong.value
+                            if (currentPlayingSong?.id == updatedSong.id) {
+                                // Call new method to reload audio
+                                playbackStateManager.reloadCurrentSongAudio()
+                            }
+                        }
 
                         playbackStateManager.refreshRecentlyPlayed(delayMs = 300)
 
                         val currentSongId = playbackStateManager.currentSong.value?.id
                         if (currentSongId == updatedSong.id) {
                             Log.d(
-                                    "SongBottomSheetVM",
-                                    "Edited the currently playing song, refreshing player state"
+                                "SongBottomSheetVM",
+                                "Edited the currently playing song, refreshing player state"
                             )
                             playbackStateManager.refreshCurrentSongData()
                         }
+
+                        // Reset the form state to clear it
+                        _state.value = SongBottomSheetState()
 
                         _eventFlow.emit(SheetEvent.SaveSuccess)
                     }
@@ -248,18 +265,20 @@ constructor(
             } else {
                 // Add new song
                 val newSong =
-                        AddSongRequest(
-                                title = currentState.title.trim(),
-                                artist = currentState.artist.trim(),
-                                filePathUri = currentState.selectedAudioUri.toString(),
-                                coverArtUri = currentState.selectedCoverUri?.toString() ?: "",
-                                duration = currentState.durationMs ?: 0L,
-                                isLiked = false
-                        )
+                    AddSongRequest(
+                        title = currentState.title.trim(),
+                        artist = currentState.artist.trim(),
+                        filePathUri = currentState.selectedAudioUri.toString(),
+                        coverArtUri = currentState.selectedCoverUri?.toString() ?: "",
+                        duration = currentState.durationMs ?: 0L,
+                        isLiked = false
+                    )
 
                 when (val result = songRepository.addSong(newSong)) {
                     is Resource.Success -> {
-                        _state.update { it.copy(isLoading = false) }
+                        // Reset the form state to clear it
+                        _state.value = SongBottomSheetState()
+
                         _eventFlow.emit(SheetEvent.SaveSuccess)
                     }
                     is Resource.Error -> {

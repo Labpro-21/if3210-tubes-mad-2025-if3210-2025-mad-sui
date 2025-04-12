@@ -3,12 +3,15 @@ package com.vibecoder.purrytify.presentation.components
 import android.annotation.SuppressLint
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.vibecoder.purrytify.R
@@ -19,7 +22,6 @@ import java.util.concurrent.TimeUnit
 fun SongBottomSheet(
         isVisible: Boolean,
         onDismiss: () -> Unit,
-        // --- Input States ---
         title: String,
         artist: String,
         audioFileName: String?,
@@ -28,7 +30,6 @@ fun SongBottomSheet(
         isLoading: Boolean,
         error: String?,
         isEditMode: Boolean = false,
-        // --- Callbacks ---
         onTitleChange: (String) -> Unit,
         onArtistChange: (String) -> Unit,
         onSave: () -> Unit,
@@ -36,6 +37,11 @@ fun SongBottomSheet(
         onCoverSelect: () -> Unit
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val scrollState = rememberScrollState()
+    val configuration = LocalConfiguration.current
+    val screenWidth = configuration.screenWidthDp.dp
+
+    val boxWidth = (screenWidth - 64.dp) / 2
 
     if (isVisible) {
         ModalBottomSheet(
@@ -63,43 +69,45 @@ fun SongBottomSheet(
             Column(
                     modifier =
                             Modifier.fillMaxWidth()
-                                    .padding(horizontal = 24.dp, vertical = 16.dp)
+                                    .verticalScroll(scrollState)
+                                    .padding(horizontal = 16.dp, vertical = 16.dp)
                                     .padding(
                                             bottom =
                                                     WindowInsets.navigationBars
                                                             .asPaddingValues()
-                                                            .calculateBottomPadding() + 16.dp
+                                                            .calculateBottomPadding()
                                     ),
                     horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
                         text = if (isEditMode) "Edit Song" else "Upload Song",
                         style = MaterialTheme.typography.titleLarge,
-                        modifier = Modifier.padding(bottom = 24.dp)
+                        modifier = Modifier.padding(bottom = 16.dp)
                 )
 
-                // --- Upload Boxes ---
+                // Upload Boxes
                 Row(
-                        modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
-                        horizontalArrangement = Arrangement.SpaceEvenly
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
+                    // Cover Upload Box
                     UploadBox(
                             label = coverFileName
                                             ?: if (isEditMode) "Change Cover" else "Upload Cover",
                             iconRes = R.drawable.ic_img_placeholder,
                             isSelected = coverFileName != null,
                             onClick = onCoverSelect,
-                            modifier = Modifier.weight(1f).padding(horizontal = 8.dp)
+                            modifier = Modifier.weight(1f)
                     )
 
-                    // In edit mode, audio file is optional
+                    // Audio Upload Box
                     UploadBox(
                             label = audioFileName
                                             ?: if (isEditMode) "Change Audio" else "Upload Audio",
                             iconRes = R.drawable.ic_song_placeholder,
                             isSelected = audioFileName != null,
                             onClick = onAudioSelect,
-                            modifier = Modifier.weight(1f).padding(horizontal = 8.dp)
+                            modifier = Modifier.weight(1f)
                     )
                 }
 
@@ -109,7 +117,7 @@ fun SongBottomSheet(
                             text = "Duration: $formattedDuration",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.secondary,
-                            modifier = Modifier.padding(bottom = 16.dp).align(Alignment.Start)
+                            modifier = Modifier.padding(bottom = 12.dp).align(Alignment.Start)
                     )
                 }
 
@@ -118,7 +126,7 @@ fun SongBottomSheet(
                         onValueChange = onTitleChange,
                         label = "Title",
                         placeholderText = "Enter song title",
-                        modifier = Modifier.padding(bottom = 16.dp),
+                        modifier = Modifier.padding(bottom = 12.dp),
                         enabled = !isLoading
                 )
 
@@ -127,7 +135,7 @@ fun SongBottomSheet(
                         onValueChange = onArtistChange,
                         label = "Artist",
                         placeholderText = "Enter artist name",
-                        modifier = Modifier.padding(bottom = 24.dp),
+                        modifier = Modifier.padding(bottom = 16.dp),
                         enabled = !isLoading
                 )
 
@@ -137,13 +145,13 @@ fun SongBottomSheet(
                             color = MaterialTheme.colorScheme.error,
                             style = MaterialTheme.typography.bodyMedium,
                             textAlign = TextAlign.Center,
-                            modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)
+                            modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
                     )
                 }
 
                 Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(16.dp)
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     SecondaryButton(
                             onClick = onDismiss,
@@ -162,7 +170,7 @@ fun SongBottomSheet(
                     )
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(8.dp))
             }
         }
     }

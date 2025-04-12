@@ -208,10 +208,6 @@ constructor(
         }
     }
 
-    fun clearRecentlyPlayed() {
-        _recentlyPlayed.value = emptyList()
-        saveRecentlyPlayed()
-    }
     private fun addToRecentlyPlayed(song: SongEntity) {
         _recentlyPlayed.update { currentList ->
             val newList = currentList.toMutableList()
@@ -897,13 +893,76 @@ constructor(
     }
     fun clearRecentlyPlayed() {
         _recentlyPlayed.value = emptyList()
-        
+
+        saveRecentlyPlayed()
+
         context.getSharedPreferences("purrytify_prefs", Context.MODE_PRIVATE)
-            .edit()
-            .remove("recently_played")
-            .apply()
-            
+                .edit()
+                .remove("recently_played")
+                .apply()
+
         Log.d(TAG, "Recently played list cleared")
     }
 
+    fun reloadCurrentSongAudio() {
+        val currentSongId = _currentSong.value?.id ?: return
+
+        mainScope.launch {
+            when (val result = songRepository.getSongById(currentSongId)) {
+                is Resource.Success -> {
+                    result.data?.let { updatedSong ->
+                        Log.d(TAG, "Reloading audio for song: ${updatedSong.title}")
+
+                        // Check if audio file has changed
+                        if (_currentSong.value?.filePathUri != updatedSong.filePathUri) {
+                            Log.d(TAG, "Audio file changed, updating player")
+
+                            val wasPlaying = _isPlaying.value
+                            val currentPos = _currentPositionMs.value
+
+                            // Stop current playback
+                            mediaController?.stop()
+
+                            _currentSong.value = updatedSong
+
+                            val newMediaItem =
+                                    MediaItem.Builder()
+                                            .setMediaId(updatedSong.id.toString())
+                                            .setUri(updatedSong.filePathUri)
+                                            .setMediaMetadata(
+                                                    MediaMetadata.Builder()
+                                                            .setTitle(updatedSong.title)
+                                                            .setArtist(updatedSong.artist)
+                                                            .setArtworkUri(
+                                                                    updatedSong.coverArtUri?.let {
+                                                                        android.net.Uri.parse(it)
+                                                                    }
+                                                            )
+                                                            .build()
+                                            )
+                                            .build()
+
+                            mediaController?.setMediaItem(newMediaItem)
+                            mediaController?.prepare()
+
+                            mediaController?.seekTo(currentPos.coerceAtMost(updatedSong.duration))
+
+                            if (wasPlaying) {
+                                mediaController?.play()
+                            }
+
+                            Log.d(TAG, "Player updated with new audio file")
+                        } else {
+                            _currentSong.value = updatedSong
+                            Log.d(TAG, "Song data updated but audio file unchanged")
+                        }
+                    }
+                }
+                is Resource.Error -> {
+                    Log.e(TAG, "Error reloading song: ${result.message}")
+                }
+                else -> {}
+            }
+        }
+    }
 }

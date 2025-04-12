@@ -15,10 +15,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import coil.compose.rememberAsyncImagePainter
-import com.vibecoder.purrytify.presentation.theme.PurrytifyTheme
 
 @Composable
 fun SmallMusicCard(
@@ -105,45 +103,6 @@ fun SmallMusicCard(
                     imageVector = Icons.Default.MoreVert,
                     contentDescription = "More Options",
                     tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-            )
-        }
-    }
-}
-
-@Preview(showBackground = true)
-@Composable
-fun SmallMusicCardPreview() {
-    PurrytifyTheme {
-        Column {
-            SmallMusicCard(
-                    title = "Normal Song",
-                    artist = "Artist Name",
-                    coverUrl = "https://example.com/cover.jpg",
-                    isPlaying = false,
-                    isCurrentSong = false,
-                    onClick = {}
-            )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            SmallMusicCard(
-                    title = "Current Song",
-                    artist = "Artist Name",
-                    coverUrl = "https://example.com/cover.jpg",
-                    isPlaying = false,
-                    isCurrentSong = true,
-                    onClick = {}
-            )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            SmallMusicCard(
-                    title = "Playing Song",
-                    artist = "Artist Name",
-                    coverUrl = "https://example.com/cover.jpg",
-                    isPlaying = true,
-                    isCurrentSong = true,
-                    onClick = {}
             )
         }
     }

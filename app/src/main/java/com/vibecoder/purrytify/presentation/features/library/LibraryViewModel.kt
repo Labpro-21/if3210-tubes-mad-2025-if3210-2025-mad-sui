@@ -7,6 +7,7 @@ import com.vibecoder.purrytify.data.local.model.SongEntity
 import com.vibecoder.purrytify.data.repository.SongRepository
 import com.vibecoder.purrytify.playback.PlaybackStateManager
 import com.vibecoder.purrytify.util.Resource
+import com.vibecoder.purrytify.util.TokenManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.delay
@@ -31,7 +32,8 @@ class LibraryViewModel
 @Inject
 constructor(
         private val songRepository: SongRepository,
-        private val playbackStateManager: PlaybackStateManager
+        private val playbackStateManager: PlaybackStateManager,
+        private val tokenManager: TokenManager
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(LibraryScreenState())
@@ -53,11 +55,25 @@ constructor(
             }
         }
 
-        // Song changes (favorite/unfavorite)
+        // Song changes
         viewModelScope.launch {
             currentSong.collect { song ->
                 if (song != null) {
                     refreshSongs()
+                }
+            }
+        }
+
+        viewModelScope.launch {
+            tokenManager.token.collect { token ->
+                if (token == null) {
+                    _state.update {
+                        it.copy(
+                                songs = emptyList(),
+                                originalSongs = emptyList(),
+                                isLoadingSongs = false
+                        )
+                    }
                 }
             }
         }

@@ -6,9 +6,11 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
@@ -25,7 +27,6 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-
 
 
 @Composable
@@ -53,7 +54,7 @@ fun UploadBox(
         contentAlignment = Alignment.Center
     ) {
 
-        Canvas(modifier = Modifier.matchParentSize()) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
             drawRoundRect(
                 color = outlineColor,
                 style = stroke,
@@ -70,7 +71,7 @@ fun UploadBox(
             Icon(
                 painter = painterResource(id = iconRes),
                 contentDescription = null,
-                modifier = Modifier.size(48.dp),
+                modifier = Modifier.size(40.dp),
                 tint = contentColor
             )
             Spacer(modifier = Modifier.height(8.dp))
@@ -80,7 +81,8 @@ fun UploadBox(
                 color = contentColor,
                 textAlign = TextAlign.Center,
                 maxLines = 2,
-                overflow = TextOverflow.Ellipsis
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.width(100.dp) // Fixed width to ensure consistent text wrapping
             )
         }
     }

@@ -58,6 +58,15 @@ constructor(
 
             playbackStateManager.stopPlayback()
             playbackStateManager.clearRecentlyPlayed()
+
+            currentUser = null
+
+            // Stop token refresh service
+            stopTokenRefreshService()
+
+            // Clear tokens
+            tokenManager.deleteToken()
+            tokenManager.deleteRefreshToken()
         } catch (e: Exception) {
             Log.e("AuthRepository", "Error during logout playback cleanup", e)
         }
