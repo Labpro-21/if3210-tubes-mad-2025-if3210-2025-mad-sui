@@ -14,47 +14,53 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 
 @Singleton
-class SongRepository @Inject constructor(private val songDao: SongDao, private  val authRepository: AuthRepository) {
+class SongRepository
+@Inject
+constructor(private val songDao: SongDao, private val authRepository: AuthRepository) {
     private val TAG = "SongRepository"
-    private val userEmail: String get() = authRepository.getCurrentUserEmail() ?: ""
+    private val userEmail: String
+        get() = authRepository.getCurrentUserEmail() ?: ""
+
+    fun getCurrentUserEmail(): String {
+        return userEmail
+    }
+
     fun getAllSongs(): Flow<List<SongEntity>> {
         Log.d(TAG, "Getting all songs for user: $userEmail")
-        return songDao.getAllSongs(userEmail)
-            .catch { e ->
-                Log.e(TAG, "Error getting all songs for user $userEmail", e)
-                emit(emptyList())
-            }
+        return songDao.getAllSongs(userEmail).catch { e ->
+            Log.e(TAG, "Error getting all songs for user $userEmail", e)
+            emit(emptyList())
+        }
     }
 
     fun getLikedSongs(): Flow<List<SongEntity>> {
         Log.d(TAG, "Getting liked songs for user: $userEmail")
-        return songDao.getLikedSongs(userEmail)
-            .catch { e ->
-                Log.e(TAG, "Error getting liked songs for user $userEmail", e)
-                emit(emptyList())
-            }
+        return songDao.getLikedSongs(userEmail).catch { e ->
+            Log.e(TAG, "Error getting liked songs for user $userEmail", e)
+            emit(emptyList())
+        }
     }
     fun getLikedSongCount(): Flow<Int> {
         Log.d(TAG, "Getting liked songs count for user: $userEmail")
-        return songDao.getLikedSongCount(userEmail)
-            .catch { e ->
-                Log.e(TAG, "Error getting liked songs count for user $userEmail", e)
-                emit(0)
-            }
+        return songDao.getLikedSongCount(userEmail).catch { e ->
+            Log.e(TAG, "Error getting liked songs count for user $userEmail", e)
+            emit(0)
+        }
     }
 
     suspend fun addSong(songReq: AddSongRequest): Resource<Unit> {
         return try {
 
-            val song = SongEntity(
-                title = songReq.title,
-                artist = songReq.artist,
-                filePathUri = songReq.filePathUri,
-                coverArtUri = songReq.coverArtUri,
-                duration = songReq.duration,
-                isLiked = songReq.isLiked,
-                userEmail = userEmail
-            )
+            val song =
+                    SongEntity(
+                            title = songReq.title,
+                            artist = songReq.artist,
+                            filePathUri = songReq.filePathUri,
+                            coverArtUri = songReq.coverArtUri,
+                            duration = songReq.duration,
+                            isLiked = songReq.isLiked,
+                            userEmail = userEmail
+                    )
             val validationResult = validateSongData(song)
             if (validationResult != null) {
                 return Resource.Error(validationResult)
@@ -86,16 +92,17 @@ class SongRepository @Inject constructor(private val songDao: SongDao, private  
     suspend fun updateSong(songReq: UpdateSongRequest): Resource<Unit> {
         return try {
             // OWASP M4 for input validation
-            val song = SongEntity(
-                id = songReq.id,
-                title = songReq.title,
-                artist = songReq.artist,
-                filePathUri = songReq.filePathUri,
-                coverArtUri = songReq.coverArtUri,
-                duration = songReq.duration,
-                isLiked = songReq.isLiked,
-                userEmail = userEmail
-            )
+            val song =
+                    SongEntity(
+                            id = songReq.id,
+                            title = songReq.title,
+                            artist = songReq.artist,
+                            filePathUri = songReq.filePathUri,
+                            coverArtUri = songReq.coverArtUri,
+                            duration = songReq.duration,
+                            isLiked = songReq.isLiked,
+                            userEmail = userEmail
+                    )
             if (song.id <= 0L) {
                 return Resource.Error("Cannot update song with invalid ID.")
             }
@@ -114,14 +121,17 @@ class SongRepository @Inject constructor(private val songDao: SongDao, private  
                 return Resource.Error("Invalid cover art URI format")
             }
 
-
-            val existingSong = songDao.getSongById(song.id)
-                ?: return Resource.Error("Cannot update non-existent or unauthorized song with ID: ${song.id} for user ${song.userEmail}")
-
-
+            val existingSong =
+                    songDao.getSongById(song.id)
+                            ?: return Resource.Error(
+                                    "Cannot update non-existent or unauthorized song with ID: ${song.id} for user ${song.userEmail}"
+                            )
 
             songDao.updateSong(song)
-            Log.i(TAG, "Song '${song.title}' (ID: ${song.id}) updated successfully for user ${song.userEmail}")
+            Log.i(
+                    TAG,
+                    "Song '${song.title}' (ID: ${song.id}) updated successfully for user ${song.userEmail}"
+            )
             Resource.Success(Unit)
         } catch (e: IOException) {
             Resource.Error("Couldn't update song in database: ${e.localizedMessage}")
@@ -190,7 +200,10 @@ class SongRepository @Inject constructor(private val songDao: SongDao, private  
             if (rowsAffected > 0) {
                 Log.d(TAG, "Marked song ID $songId as listened for user $userEmail")
             } else {
-                Log.d(TAG, "Song ID $songId was already marked as listened or not found for user $userEmail")
+                Log.d(
+                        TAG,
+                        "Song ID $songId was already marked as listened or not found for user $userEmail"
+                )
             }
             Resource.Success(Unit)
         } catch (e: Exception) {
@@ -200,19 +213,17 @@ class SongRepository @Inject constructor(private val songDao: SongDao, private  
     }
     fun getSongCount(): Flow<Int> {
         Log.d(TAG, "Getting song count for user: $userEmail")
-        return songDao.getSongCount(userEmail)
-            .catch { e ->
-                Log.e(TAG, "Error getting song count for user $userEmail", e)
-                emit(0)
-            }
+        return songDao.getSongCount(userEmail).catch { e ->
+            Log.e(TAG, "Error getting song count for user $userEmail", e)
+            emit(0)
+        }
     }
     fun getListenedSongCount(): Flow<Int> {
         Log.d(TAG, "Getting count of listened songs for user: $userEmail")
-        return songDao.getListenedSongCount(userEmail)
-            .catch { e ->
-                Log.e(TAG, "Error getting listened song count for user $userEmail", e)
-                emit(0)
-            }
+        return songDao.getListenedSongCount(userEmail).catch { e ->
+            Log.e(TAG, "Error getting listened song count for user $userEmail", e)
+            emit(0)
+        }
     }
 
     // OWASP M4

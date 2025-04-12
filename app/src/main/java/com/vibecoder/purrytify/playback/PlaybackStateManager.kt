@@ -149,14 +149,37 @@ constructor(
         }
     }
 
-    // Load recently played songs from SharedPreferences
+    private fun saveRecentlyPlayed() {
+        mainScope.launch(Dispatchers.IO) {
+            try {
+                val userEmail = songRepository.getCurrentUserEmail() ?: ""
+                val storageKey =
+                        if (userEmail.isNotEmpty()) "recently_played_$userEmail"
+                        else "recently_played"
+
+                val recentlyPlayedJson = gson.toJson(_recentlyPlayed.value.map { it.id })
+                context.getSharedPreferences("purrytify_prefs", Context.MODE_PRIVATE)
+                        .edit()
+                        .putString(storageKey, recentlyPlayedJson)
+                        .apply()
+            } catch (e: Exception) {
+                Log.e(TAG, "Error saving recently played songs", e)
+            }
+        }
+    }
+
     private fun loadRecentlyPlayed() {
         mainScope.launch {
             try {
+                val userEmail = songRepository.getCurrentUserEmail() ?: ""
+                val storageKey =
+                        if (userEmail.isNotEmpty()) "recently_played_$userEmail"
+                        else "recently_played"
+
                 // Get stored IDs from SharedPreferences
                 val recentlyPlayedJson =
                         context.getSharedPreferences("purrytify_prefs", Context.MODE_PRIVATE)
-                                .getString("recently_played", null)
+                                .getString(storageKey, null)
 
                 if (recentlyPlayedJson != null) {
                     val songIds =
@@ -185,21 +208,10 @@ constructor(
         }
     }
 
-    // Save recently played songs to persistent storage
-    private fun saveRecentlyPlayed() {
-        mainScope.launch(Dispatchers.IO) {
-            try {
-                val recentlyPlayedJson = gson.toJson(_recentlyPlayed.value.map { it.id })
-                context.getSharedPreferences("purrytify_prefs", Context.MODE_PRIVATE)
-                        .edit()
-                        .putString("recently_played", recentlyPlayedJson)
-                        .apply()
-            } catch (e: Exception) {
-                Log.e(TAG, "Error saving recently played songs", e)
-            }
-        }
+    fun clearRecentlyPlayed() {
+        _recentlyPlayed.value = emptyList()
+        saveRecentlyPlayed()
     }
-
     private fun addToRecentlyPlayed(song: SongEntity) {
         _recentlyPlayed.update { currentList ->
             val newList = currentList.toMutableList()

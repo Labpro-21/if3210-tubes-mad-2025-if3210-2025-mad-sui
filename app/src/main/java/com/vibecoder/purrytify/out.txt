@@ -1,0 +1,80 @@
+.
+├── data
+│   ├── local
+│   │   ├── AppDatabase.kt
+│   │   ├── dao
+│   │   │   └── SongDao.kt
+│   │   ├── dto
+│   │   │   └── SongDto.kt
+│   │   └── model
+│   │       └── SongEntity.kt
+│   ├── remote
+│   │   ├── dto
+│   │   │   └── LoginRequest.kt
+│   │   └── PurrytifyApi.kt
+│   └── repository
+│       ├── AuthRepository.kt
+│       └── SongRepository.kt
+├── di
+│   ├── DatabaseModule.kt
+│   ├── GsonModule.kt
+│   └── NetworkModule.kt
+├── MainActivity.kt
+├── out.txt
+├── playback
+│   ├── PlaybackMode.kt
+│   ├── PlaybackStateManager.kt
+│   └── PlayerService.kt
+├── presentation
+│   ├── components
+│   │   ├── BottomNavigationBar.kt
+│   │   ├── Buttons.kt
+│   │   ├── Input.kt
+│   │   ├── MinimizedMusicPlayer.kt
+│   │   ├── MusicCard.kt
+│   │   ├── NetworkAwareApp.kt
+│   │   ├── SmallMusicCard.kt
+│   │   ├── SongBottomSheet.kt
+│   │   ├── SongContextMenu.kt
+│   │   └── UploadBox.kt
+│   ├── features
+│   │   ├── auth
+│   │   │   ├── LoginScreen.kt
+│   │   │   └── LoginViewModel.kt
+│   │   ├── home
+│   │   │   ├── HomeScreen.kt
+│   │   │   └── HomeViewModel.kt
+│   │   ├── library
+│   │   │   ├── LibraryScreen.kt
+│   │   │   ├── LibraryViewModel.kt
+│   │   │   ├── SongAdapter.kt
+│   │   │   └── SongBottomSheetViewModel.kt
+│   │   ├── network
+│   │   │   └── NetworkStateViewModel.kt
+│   │   ├── player
+│   │   │   ├── FullScreenPlayerScreen.kt
+│   │   │   ├── PlayerOptionsMenu.kt
+│   │   │   └── PlayerViewModel.kt
+│   │   ├── profile
+│   │   │   ├── ProfileScreen.kt
+│   │   │   └── ProfileViewModel.kt
+│   │   ├── shared
+│   │   │   └── SharedMinimizedMusicPlayer.kt
+│   │   └── splash
+│   │       └── SplashViewModel.kt
+│   └── theme
+│       ├── Color.kt
+│       ├── Shapes.kt
+│       ├── Theme.kt
+│       └── Type.kt
+├── PurrytifyApplication.kt
+├── script.sh
+├── tokenrefresh
+│   └── TokenRefreshService.kt
+└── util
+    ├── AuthInterceptor.kt
+    ├── NetworkMonitor.kt
+    ├── Resource.kt
+    └── TokenManager.kt
+
+25 directories, 53 files

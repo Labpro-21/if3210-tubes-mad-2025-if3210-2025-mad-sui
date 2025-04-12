@@ -2,29 +2,33 @@ package com.vibecoder.purrytify.data.repository
 
 import android.content.Context
 import android.content.Intent
+import android.util.Log
 import com.vibecoder.purrytify.data.remote.PurrytifyApi
 import com.vibecoder.purrytify.data.remote.dto.LoginRequest
 import com.vibecoder.purrytify.data.remote.dto.RefreshTokenRequest
 import com.vibecoder.purrytify.data.remote.dto.UserDto
+import com.vibecoder.purrytify.playback.PlaybackStateManager
 import com.vibecoder.purrytify.tokenrefresh.TokenRefreshService
-
 import com.vibecoder.purrytify.util.Resource
 import com.vibecoder.purrytify.util.TokenManager
 import dagger.hilt.android.qualifiers.ApplicationContext
-import kotlinx.coroutines.flow.first
-import retrofit2.HttpException
 import java.io.IOException
 import javax.inject.Inject
+import javax.inject.Provider
 import javax.inject.Singleton
+import kotlinx.coroutines.flow.first
+import retrofit2.HttpException
 
 @Singleton
-class AuthRepository @Inject constructor(
-    @ApplicationContext private val context: Context,
-    private val api: PurrytifyApi,
-    private val tokenManager: TokenManager
-)  {
+class AuthRepository
+@Inject
+constructor(
+        @ApplicationContext private val context: Context,
+        private val api: PurrytifyApi,
+        private val tokenManager: TokenManager,
+        private val playbackStateManagerProvider: Provider<PlaybackStateManager>
+) {
     private var currentUser: UserDto? = null
-
 
     suspend fun login(email: String, password: String): Resource<Unit> {
         return try {
@@ -33,7 +37,7 @@ class AuthRepository @Inject constructor(
             tokenManager.saveRefreshToken(response.refreshToken)
             startTokenRefreshService()
             val profileResult = getProfileInternal()
-            if(profileResult is Resource.Success){
+            if (profileResult is Resource.Success) {
                 currentUser = profileResult.data
             } else {
                 return Resource.Error("Failed to fetch user profile after login.")
@@ -49,10 +53,22 @@ class AuthRepository @Inject constructor(
     }
 
     suspend fun logout() {
+        try {
+            val playbackStateManager = playbackStateManagerProvider.get()
+
+            playbackStateManager.stopPlayback()
+            playbackStateManager.clearRecentlyPlayed()
+        } catch (e: Exception) {
+            Log.e("AuthRepository", "Error during logout playback cleanup", e)
+        }
+
+        // Continue with logout process
         stopTokenRefreshService()
         tokenManager.deleteToken()
         tokenManager.deleteRefreshToken()
         currentUser = null
+
+        Log.d("AuthRepository", "User logged out successfully")
     }
 
     suspend fun refreshToken(): Resource<Unit> {
@@ -71,7 +87,6 @@ class AuthRepository @Inject constructor(
             logout()
             Resource.Error("Failed to refresh token: ${e.message()}. Logged out.")
         } catch (e: IOException) {
-
             Resource.Error("Network error during token refresh.")
         } catch (e: Exception) {
             logout()
@@ -95,23 +110,27 @@ class AuthRepository @Inject constructor(
             Resource.Error("Failed to verify token: Unexpected error.")
         }
     }
-    private fun startTokenRefreshService(){
+
+    private fun startTokenRefreshService() {
         val intent = Intent(context, TokenRefreshService::class.java)
         context.startService(intent)
     }
 
-    private  fun stopTokenRefreshService(){
+    private fun stopTokenRefreshService() {
         val intent = Intent(context, TokenRefreshService::class.java)
         context.stopService(intent)
     }
+
     fun getCurrentUserEmail(): String? {
         return currentUser?.email
     }
+
     suspend fun getProfile(): Resource<UserDto> {
-        currentUser?.let { return Resource.Success(it) }
+        currentUser?.let {
+            return Resource.Success(it)
+        }
         return getProfileInternal()
     }
-
 
     private suspend fun getProfileInternal(): Resource<UserDto> {
         return try {
