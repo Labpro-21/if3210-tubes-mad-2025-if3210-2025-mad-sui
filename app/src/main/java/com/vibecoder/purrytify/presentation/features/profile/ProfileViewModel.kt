@@ -11,15 +11,17 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 import android.util.Log
 import com.vibecoder.purrytify.data.repository.AuthRepository
+import com.vibecoder.purrytify.playback.PlaybackStateManager
+
 sealed class NavigationEvent {
     object NavigateToLogin : NavigationEvent()
-    // Add other navigation events like NavigateToEditProfile if needed
 }
 
 @HiltViewModel
 class ProfileViewModel @Inject constructor(
     private val authRepository: AuthRepository,
-    private val songRepository: SongRepository
+    private val songRepository: SongRepository,
+    private val playbackStateManager: PlaybackStateManager
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(ProfileScreenState())
@@ -128,6 +130,10 @@ class ProfileViewModel @Inject constructor(
     fun logout() {
         viewModelScope.launch {
             authRepository.logout()
+            playbackStateManager.clearRecentlyPlayed()
+            playbackStateManager.stopPlayback()
+            playbackStateManager.releaseController()
+
             _navigationEvent.emit(NavigationEvent.NavigateToLogin)
         }
     }

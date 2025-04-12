@@ -883,4 +883,15 @@ constructor(
         mediaControllerFuture = null
         resetState()
     }
+    fun clearRecentlyPlayed() {
+        _recentlyPlayed.value = emptyList()
+        
+        context.getSharedPreferences("purrytify_prefs", Context.MODE_PRIVATE)
+            .edit()
+            .remove("recently_played")
+            .apply()
+            
+        Log.d(TAG, "Recently played list cleared")
+    }
+
 }

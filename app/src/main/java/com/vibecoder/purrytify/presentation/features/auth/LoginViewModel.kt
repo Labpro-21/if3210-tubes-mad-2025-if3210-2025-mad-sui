@@ -4,6 +4,7 @@ import android.util.Patterns
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.vibecoder.purrytify.data.repository.AuthRepository
+import com.vibecoder.purrytify.playback.PlaybackStateManager
 import com.vibecoder.purrytify.util.Resource
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -23,7 +24,7 @@ data class LoginState(
 )
 
 @HiltViewModel
-class LoginViewModel @Inject constructor(private val authRepository: AuthRepository) : ViewModel() {
+class LoginViewModel @Inject constructor(private val authRepository: AuthRepository, private val playbackStateManager: PlaybackStateManager) : ViewModel() {
 
     private val _state = MutableStateFlow(LoginState())
     val state: StateFlow<LoginState> = _state.asStateFlow()
@@ -55,6 +56,7 @@ class LoginViewModel @Inject constructor(private val authRepository: AuthReposit
                     when (result) {
                         is Resource.Success -> {
                             _state.value.copy(isLoading = false, isSuccess = true, error = null)
+
                         }
                         is Resource.Error -> {
                             _state.value.copy(
