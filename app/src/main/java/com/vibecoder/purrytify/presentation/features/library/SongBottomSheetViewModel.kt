@@ -7,6 +7,8 @@ import android.net.Uri
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.vibecoder.purrytify.data.local.dto.AddSongRequest
+import com.vibecoder.purrytify.data.local.dto.UpdateSongRequest
 import com.vibecoder.purrytify.data.local.model.SongEntity
 import com.vibecoder.purrytify.data.repository.SongRepository
 import com.vibecoder.purrytify.playback.PlaybackStateManager
@@ -209,7 +211,7 @@ constructor(
             if (currentState.isEditMode) {
                 // Update existing song
                 val updatedSong =
-                        SongEntity(
+                        UpdateSongRequest(
                                 id = currentState.id,
                                 title = currentState.title.trim(),
                                 artist = currentState.artist.trim(),
@@ -246,7 +248,7 @@ constructor(
             } else {
                 // Add new song
                 val newSong =
-                        SongEntity(
+                        AddSongRequest(
                                 title = currentState.title.trim(),
                                 artist = currentState.artist.trim(),
                                 filePathUri = currentState.selectedAudioUri.toString(),

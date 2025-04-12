@@ -8,7 +8,9 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.ModeEditOutline
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -26,6 +28,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
+import com.vibecoder.purrytify.AppDestinations
 import com.vibecoder.purrytify.R
 import com.vibecoder.purrytify.presentation.components.MusicCard
 import com.vibecoder.purrytify.presentation.components.BottomNavigationBar
@@ -34,10 +37,30 @@ import com.vibecoder.purrytify.presentation.features.home.SectionHeader
 
 @Composable
 fun ProfileScreen(
+    navController: NavController,
     viewModel: ProfileViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val screenHeightDp = LocalConfiguration.current.screenHeightDp.dp
+
+    LaunchedEffect(key1 = Unit) {
+        viewModel.navigationEvent.collect { event ->
+            when (event) {
+                is NavigationEvent.NavigateToLogin -> {
+                    navController.navigate(AppDestinations.LOGIN_ROUTE) {
+                        // Clear the entire back stack up to the root of the graph
+                        popUpTo(navController.graph.startDestinationId) {
+                            inclusive = true
+                        }
+                        // Prevent multiple instances of the login screen
+                        launchSingleTop = true
+                    }
+                }
+                // Handle other navigation events like NavigateToEditProfile here
+            }
+        }
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -53,7 +76,20 @@ fun ProfileScreen(
                     )
                 )
         )
-
+        IconButton(
+            onClick = { viewModel.logout() },
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(16.dp)
+                .size(48.dp)
+                .background(Color(0x33FFFFFF), CircleShape)
+        ) {
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.Logout,
+                contentDescription = "Logout",
+                tint = Color.White
+            )
+        }
         when {
             state.isLoading -> {
                 CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))

@@ -163,7 +163,18 @@ fun LoginScreen(
                 }
 
                 Spacer(modifier = Modifier.height(32.dp))
-
+                if (state.error != null) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = state.error!!,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodyMedium,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp)
+                    )
+                }
                 //  Login Button
                 PrimaryButton(
                     text = stringResource(R.string.login_button),

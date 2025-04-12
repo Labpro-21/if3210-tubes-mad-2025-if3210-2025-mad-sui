@@ -31,6 +31,11 @@ import com.vibecoder.purrytify.presentation.components.SmallMusicCard
 import com.vibecoder.purrytify.presentation.components.SongBottomSheet
 import com.vibecoder.purrytify.presentation.components.SongContextMenu
 import com.vibecoder.purrytify.presentation.features.player.PlayerViewModel
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalPermissionsApi::class)
 @Composable
@@ -183,42 +188,41 @@ fun LibraryScreen(
                 }
             }
             else -> {
-                // Using Compose LazyColumn
-                LazyColumn(
-                        modifier = Modifier.weight(1f),
-                        contentPadding = PaddingValues(vertical = 8.dp)
-                ) {
-                    items(items = libraryState.songs, key = { song -> song.id }) { song ->
-                        val isCurrentSong = song.id == currentSong?.id
-                        val isSongPlaying = isCurrentSong && isPlaying
-
-                        SmallMusicCard(
-                                title = song.title,
-                                artist = song.artist,
-                                coverUrl = song.coverArtUri ?: "",
-                                isPlaying = isSongPlaying,
-                                isCurrentSong = isCurrentSong,
-                                onClick = { libraryViewModel.onPlaySong(song) },
-                                onPlayPauseClick = {
-                                    if (isCurrentSong) {
+                AndroidView(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth(),
+                    factory = { context ->
+                        RecyclerView(context).apply {
+                            layoutManager = LinearLayoutManager(context)
+                            adapter = SongAdapter(
+                                songs = libraryState.songs,
+                                currentSongId = currentSong?.id ?: -1,
+                                isPlaying = isPlaying,
+                                onItemClick = { song ->
+                                    libraryViewModel.onPlaySong(song)
+                                },
+                                onPlayPauseClick = { song ->
+                                    if (song.id == currentSong?.id) {
                                         libraryViewModel.togglePlayPause()
                                     } else {
                                         libraryViewModel.onPlaySong(song)
                                     }
                                 },
-                                onMoreOptionsClick = {
+                                onMoreOptionsClick = { song ->
                                     selectedSong = song
                                     showContextMenu = true
                                 }
-                        )
-
-                        HorizontalDivider(
-                                modifier = Modifier.padding(start = 64.dp),
-                                thickness = 0.5.dp,
-                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                        )
+                            )
+                        }
+                    },
+                    update = { recyclerView ->
+                        (recyclerView.adapter as? SongAdapter)?.apply {
+                            updateSongs(libraryState.songs)
+                            updateCurrentSong(currentSong?.id ?: -1, isPlaying)
+                        }
                     }
-                }
+                )
             }
         }
     }

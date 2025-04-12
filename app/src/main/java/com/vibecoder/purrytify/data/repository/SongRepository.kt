@@ -1,28 +1,60 @@
 package com.vibecoder.purrytify.data.repository
 
 import android.net.Uri
+import android.util.Log
 import com.vibecoder.purrytify.data.local.dao.SongDao
+import com.vibecoder.purrytify.data.local.dto.AddSongRequest
+import com.vibecoder.purrytify.data.local.dto.UpdateSongRequest
 import com.vibecoder.purrytify.data.local.model.SongEntity
 import com.vibecoder.purrytify.util.Resource
 import java.io.IOException
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.catch
 
 @Singleton
-class SongRepository @Inject constructor(private val songDao: SongDao) {
-
+class SongRepository @Inject constructor(private val songDao: SongDao, private  val authRepository: AuthRepository) {
+    private val TAG = "SongRepository"
+    private val userEmail: String get() = authRepository.getCurrentUserEmail() ?: ""
     fun getAllSongs(): Flow<List<SongEntity>> {
-        return songDao.getAllSongs()
+        Log.d(TAG, "Getting all songs for user: $userEmail")
+        return songDao.getAllSongs(userEmail)
+            .catch { e ->
+                Log.e(TAG, "Error getting all songs for user $userEmail", e)
+                emit(emptyList())
+            }
     }
 
     fun getLikedSongs(): Flow<List<SongEntity>> {
-        return songDao.getLikedSongs()
+        Log.d(TAG, "Getting liked songs for user: $userEmail")
+        return songDao.getLikedSongs(userEmail)
+            .catch { e ->
+                Log.e(TAG, "Error getting liked songs for user $userEmail", e)
+                emit(emptyList())
+            }
+    }
+    fun getLikedSongCount(): Flow<Int> {
+        Log.d(TAG, "Getting liked songs count for user: $userEmail")
+        return songDao.getLikedSongCount(userEmail)
+            .catch { e ->
+                Log.e(TAG, "Error getting liked songs count for user $userEmail", e)
+                emit(0)
+            }
     }
 
-    suspend fun addSong(song: SongEntity): Resource<Unit> {
+    suspend fun addSong(songReq: AddSongRequest): Resource<Unit> {
         return try {
-            //  OWASP M4 for input validation
+
+            val song = SongEntity(
+                title = songReq.title,
+                artist = songReq.artist,
+                filePathUri = songReq.filePathUri,
+                coverArtUri = songReq.coverArtUri,
+                duration = songReq.duration,
+                isLiked = songReq.isLiked,
+                userEmail = userEmail
+            )
             val validationResult = validateSongData(song)
             if (validationResult != null) {
                 return Resource.Error(validationResult)
@@ -51,9 +83,19 @@ class SongRepository @Inject constructor(private val songDao: SongDao) {
         }
     }
 
-    suspend fun updateSong(song: SongEntity): Resource<Unit> {
+    suspend fun updateSong(songReq: UpdateSongRequest): Resource<Unit> {
         return try {
             // OWASP M4 for input validation
+            val song = SongEntity(
+                id = songReq.id,
+                title = songReq.title,
+                artist = songReq.artist,
+                filePathUri = songReq.filePathUri,
+                coverArtUri = songReq.coverArtUri,
+                duration = songReq.duration,
+                isLiked = songReq.isLiked,
+                userEmail = userEmail
+            )
             if (song.id <= 0L) {
                 return Resource.Error("Cannot update song with invalid ID.")
             }
@@ -72,13 +114,14 @@ class SongRepository @Inject constructor(private val songDao: SongDao) {
                 return Resource.Error("Invalid cover art URI format")
             }
 
-            // Verify the song exists before updating
+
             val existingSong = songDao.getSongById(song.id)
-            if (existingSong == null) {
-                return Resource.Error("Cannot update non-existent song with ID: ${song.id}")
-            }
+                ?: return Resource.Error("Cannot update non-existent or unauthorized song with ID: ${song.id} for user ${song.userEmail}")
+
+
 
             songDao.updateSong(song)
+            Log.i(TAG, "Song '${song.title}' (ID: ${song.id}) updated successfully for user ${song.userEmail}")
             Resource.Success(Unit)
         } catch (e: IOException) {
             Resource.Error("Couldn't update song in database: ${e.localizedMessage}")
@@ -137,6 +180,39 @@ class SongRepository @Inject constructor(private val songDao: SongDao) {
         } catch (e: Exception) {
             Resource.Error("Failed to update like status: ${e.localizedMessage}")
         }
+    }
+    suspend fun markAsListened(songId: Long): Resource<Unit> {
+        return try {
+            if (songId <= 0L || userEmail.isBlank()) {
+                return Resource.Error("Invalid song ID or User Email.")
+            }
+            val rowsAffected = songDao.markAsListened(songId, userEmail)
+            if (rowsAffected > 0) {
+                Log.d(TAG, "Marked song ID $songId as listened for user $userEmail")
+            } else {
+                Log.d(TAG, "Song ID $songId was already marked as listened or not found for user $userEmail")
+            }
+            Resource.Success(Unit)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error marking song ID $songId as listened for user $userEmail", e)
+            Resource.Error("Failed to update listened status: ${e.localizedMessage}")
+        }
+    }
+    fun getSongCount(): Flow<Int> {
+        Log.d(TAG, "Getting song count for user: $userEmail")
+        return songDao.getSongCount(userEmail)
+            .catch { e ->
+                Log.e(TAG, "Error getting song count for user $userEmail", e)
+                emit(0)
+            }
+    }
+    fun getListenedSongCount(): Flow<Int> {
+        Log.d(TAG, "Getting count of listened songs for user: $userEmail")
+        return songDao.getListenedSongCount(userEmail)
+            .catch { e ->
+                Log.e(TAG, "Error getting listened song count for user $userEmail", e)
+                emit(0)
+            }
     }
 
     // OWASP M4

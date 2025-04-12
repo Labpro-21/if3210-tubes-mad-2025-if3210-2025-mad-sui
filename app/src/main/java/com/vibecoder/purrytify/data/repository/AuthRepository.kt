@@ -23,6 +23,8 @@ class AuthRepository @Inject constructor(
     private val api: PurrytifyApi,
     private val tokenManager: TokenManager
 )  {
+    private var currentUser: UserDto? = null
+
 
     suspend fun login(email: String, password: String): Resource<Unit> {
         return try {
@@ -30,6 +32,12 @@ class AuthRepository @Inject constructor(
             tokenManager.saveToken(response.accessToken)
             tokenManager.saveRefreshToken(response.refreshToken)
             startTokenRefreshService()
+            val profileResult = getProfileInternal()
+            if(profileResult is Resource.Success){
+                currentUser = profileResult.data
+            } else {
+                return Resource.Error("Failed to fetch user profile after login.")
+            }
             Resource.Success(Unit)
         } catch (e: HttpException) {
             Resource.Error(message = "Invalid credentials or server error.")
@@ -44,6 +52,7 @@ class AuthRepository @Inject constructor(
         stopTokenRefreshService()
         tokenManager.deleteToken()
         tokenManager.deleteRefreshToken()
+        currentUser = null
     }
 
     suspend fun refreshToken(): Resource<Unit> {
@@ -52,6 +61,7 @@ class AuthRepository @Inject constructor(
             if (!refreshToken.isNullOrEmpty()) {
                 val response = api.refreshToken(RefreshTokenRequest(refreshToken))
                 tokenManager.saveToken(response.accessToken)
+                getProfileInternal()
                 Resource.Success(Unit)
             } else {
                 logout()
@@ -66,26 +76,6 @@ class AuthRepository @Inject constructor(
         } catch (e: Exception) {
             logout()
             Resource.Error("Unexpected error during token refresh. Logged out.")
-        }
-    }
-
-
-    suspend fun getProfile(): Resource<UserDto> {
-        return try {
-            val responseDto = api.getProfile()
-            Resource.Success(responseDto)
-        } catch (e: HttpException) {
-
-            if (e.code() == 401 || e.code() == 403) {
-
-                Resource.Error("Authentication required. Please login again.")
-            } else {
-                Resource.Error("Failed to fetch profile: Server error (${e.code()}).")
-            }
-        } catch (e: IOException) {
-            Resource.Error("Failed to fetch profile: Network error.")
-        } catch (e: Exception) {
-            Resource.Error("Failed to fetch profile: Unexpected error.")
         }
     }
 
@@ -113,5 +103,31 @@ class AuthRepository @Inject constructor(
     private  fun stopTokenRefreshService(){
         val intent = Intent(context, TokenRefreshService::class.java)
         context.stopService(intent)
+    }
+    fun getCurrentUserEmail(): String? {
+        return currentUser?.email
+    }
+    suspend fun getProfile(): Resource<UserDto> {
+        currentUser?.let { return Resource.Success(it) }
+        return getProfileInternal()
+    }
+
+
+    private suspend fun getProfileInternal(): Resource<UserDto> {
+        return try {
+            val responseDto = api.getProfile()
+            currentUser = responseDto
+            Resource.Success(responseDto)
+        } catch (e: HttpException) {
+            if (e.code() == 401 || e.code() == 403) {
+                Resource.Error("Authentication required. Please login again.")
+            } else {
+                Resource.Error("Failed to fetch profile: Server error (${e.code()}).")
+            }
+        } catch (e: IOException) {
+            Resource.Error("Failed to fetch profile: Network error.")
+        } catch (e: Exception) {
+            Resource.Error("Failed to fetch profile: Unexpected error.")
+        }
     }
 }

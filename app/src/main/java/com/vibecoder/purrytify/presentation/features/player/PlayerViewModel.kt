@@ -1,5 +1,6 @@
 package com.vibecoder.purrytify.presentation.features.player
 
+import android.media.session.PlaybackState
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -103,10 +104,26 @@ constructor(
     init {
         refreshQueueSongs()
         viewModelScope.launch { queue.collect { refreshQueueSongs() } }
+        playBackObserver()
     }
 
     fun setPlayerVisibility(isVisible: Boolean) {
         _isPlayerVisible.value = isVisible
+    }   
+
+    fun playBackObserver(){
+        viewModelScope.launch {
+            playbackState.collect { state ->
+                if (state == PlaybackState.STATE_PLAYING) {
+                    currentSong.value?.let { song ->
+
+                        viewModelScope.launch {
+                            songRepository.markAsListened(song.id)
+                        }
+                    }
+                }
+            }
+        }
     }
 
     fun refreshPlayerState() {
@@ -328,7 +345,8 @@ constructor(
                                         artist = "",
                                         filePathUri = "",
                                         coverArtUri = null,
-                                        duration = 0
+                                        duration = 0,
+                                        userEmail = ""
                                 )
                         )
                     }

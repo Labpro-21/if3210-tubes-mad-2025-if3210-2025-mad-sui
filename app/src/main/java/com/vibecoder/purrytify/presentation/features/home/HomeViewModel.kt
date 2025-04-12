@@ -19,7 +19,8 @@ data class HomeScreenState(
         val isLoading: Boolean = true,
         val error: String? = null,
         val showEditDialog: Boolean = false,
-        val songToEdit: SongEntity? = null
+        val songToEdit: SongEntity? = null,
+        val currentUserEmail: String? = null
 )
 
 @HiltViewModel

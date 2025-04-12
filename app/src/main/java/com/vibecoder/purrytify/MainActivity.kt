@@ -210,7 +210,7 @@ fun AppNavHost(
 
         composable(AppDestinations.LIBRARY_ROUTE) { LibraryScreen() }
 
-        composable(AppDestinations.PROFILE_ROUTE) { ProfileScreen() }
+        composable(AppDestinations.PROFILE_ROUTE) { ProfileScreen(navController) }
 
         composable(AppDestinations.PLAYER_ROUTE) {
             val playerViewModel: PlayerViewModel = hiltViewModel()

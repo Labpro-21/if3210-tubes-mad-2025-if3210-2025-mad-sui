@@ -11,18 +11,21 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 import android.util.Log
 import com.vibecoder.purrytify.data.repository.AuthRepository
+sealed class NavigationEvent {
+    object NavigateToLogin : NavigationEvent()
+    // Add other navigation events like NavigateToEditProfile if needed
+}
 
 @HiltViewModel
 class ProfileViewModel @Inject constructor(
-    private val authRepository: AuthRepository
+    private val authRepository: AuthRepository,
+    private val songRepository: SongRepository
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(ProfileScreenState())
     val state: StateFlow<ProfileScreenState> = _state.asStateFlow()
-
-    val isCurrentSongFavorite: StateFlow<Boolean> = _state.map { it.currentSong?.isLiked ?: false }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
-
+    private val _navigationEvent = MutableSharedFlow<NavigationEvent>()
+    val navigationEvent: SharedFlow<NavigationEvent> = _navigationEvent.asSharedFlow()
     init {
         loadUserProfile()
     }
@@ -33,19 +36,15 @@ class ProfileViewModel @Inject constructor(
             when (val result = authRepository.getProfile()) {
                 is Resource.Success -> {
                     result.data.let { userDto ->
-                        _state.update {
-                            it.copy(
-                                isLoading = false,
+                        _state.update { currentState ->
+                            currentState.copy(
+
                                 userProfile = UserProfile(
                                     id = userDto.id.toString(),
                                     username = userDto.username,
                                     location = userDto.location,
-                                    profileImageUrl = userDto.profilePhoto
-                                ),
-                                userStats = UserStats(
-                                    songCount = 0,
-                                    likedCount = 0,
-                                    listenedCount = 0
+                                    profileImageUrl = constructProfilePhotoUrl(userDto.profilePhoto),
+
                                 )
                             )
                         }
@@ -62,6 +61,12 @@ class ProfileViewModel @Inject constructor(
                 }
             }
         }
+    }
+    private fun constructProfilePhotoUrl(path: String?): String {
+        val baseUrl = "http://34.101.226.132:3000/uploads/profile-picture"
+        Log.d("ProfileViewModel", "Constructing profile photo URL with path: $path")
+        Log.d("ProfileViewModel", "full path : $baseUrl/$path")
+        return "$baseUrl/$path"
     }
 
     private fun loadPlaceholderProfile() {
@@ -97,28 +102,34 @@ class ProfileViewModel @Inject constructor(
 
     private fun loadUserStats() {
         viewModelScope.launch {
-            try {
-                val likedCount = 33
-                val songCount = 66
-                val listenedCount = 99
-                // TODO : Take real data
-
-                _state.update {
-                    it.copy(
-                        userStats = UserStats(
-                            songCount = songCount,
-                            likedCount = likedCount,
-                            listenedCount = listenedCount
-                        )
-                    )
-                }
-            } catch (e: Exception) {
-                Log.e("ProfileViewModel", "Error loading user stats", e)
+            combine(
+                songRepository.getSongCount(),
+                songRepository.getLikedSongCount(),
+                songRepository.getListenedSongCount()
+            ) { songCount, likedCount, listenedCount ->
+                UserStats(
+                    songCount = songCount,
+                    likedCount = likedCount,
+                    listenedCount = listenedCount
+                )
+            }.catch { e ->
+                Log.e("ProfileViewModel", "Error loading user stats for user ", e)
+                _state.update { it.copy(userStats = UserStats(), error = "Failed to load stats.") }
+            }.collect { stats ->
+                _state.update { it.copy(userStats = stats, isLoading = false) }
             }
         }
     }
+
     fun navigateToEditProfile() {
         Log.d("ProfileViewModel", "Navigate to edit profile")
+    }
+
+    fun logout() {
+        viewModelScope.launch {
+            authRepository.logout()
+            _navigationEvent.emit(NavigationEvent.NavigateToLogin)
+        }
     }
 }
 
