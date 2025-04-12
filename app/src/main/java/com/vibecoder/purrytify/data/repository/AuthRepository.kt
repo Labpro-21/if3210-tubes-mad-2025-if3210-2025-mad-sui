@@ -26,7 +26,6 @@ constructor(
         @ApplicationContext private val context: Context,
         private val api: PurrytifyApi,
         private val tokenManager: TokenManager,
-        private val playbackStateManagerProvider: Provider<PlaybackStateManager>
 ) {
     private var currentUser: UserDto? = null
 
@@ -53,31 +52,10 @@ constructor(
     }
 
     suspend fun logout() {
-        try {
-            val playbackStateManager = playbackStateManagerProvider.get()
-
-            playbackStateManager.stopPlayback()
-            playbackStateManager.clearRecentlyPlayed()
-
-            currentUser = null
-
-            // Stop token refresh service
-            stopTokenRefreshService()
-
-            // Clear tokens
-            tokenManager.deleteToken()
-            tokenManager.deleteRefreshToken()
-        } catch (e: Exception) {
-            Log.e("AuthRepository", "Error during logout playback cleanup", e)
-        }
-
-        // Continue with logout process
         stopTokenRefreshService()
         tokenManager.deleteToken()
         tokenManager.deleteRefreshToken()
         currentUser = null
-
-        Log.d("AuthRepository", "User logged out successfully")
     }
 
     suspend fun refreshToken(): Resource<Unit> {

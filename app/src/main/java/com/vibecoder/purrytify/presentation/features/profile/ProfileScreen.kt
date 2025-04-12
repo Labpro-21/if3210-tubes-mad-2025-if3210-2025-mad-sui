@@ -30,10 +30,6 @@ import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.vibecoder.purrytify.AppDestinations
 import com.vibecoder.purrytify.R
-import com.vibecoder.purrytify.presentation.components.MusicCard
-import com.vibecoder.purrytify.presentation.components.BottomNavigationBar
-import com.vibecoder.purrytify.presentation.components.MinimizedMusicPlayer
-import com.vibecoder.purrytify.presentation.features.home.SectionHeader
 
 @Composable
 fun ProfileScreen(
