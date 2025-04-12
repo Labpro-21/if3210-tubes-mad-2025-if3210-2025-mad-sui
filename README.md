@@ -1,3 +1,69 @@
+# Purrytify - Application Description
+Purrytify is a android mobile app designed to stream music. User can add their own music and manage it by adding their music to favorite list. Purrytify support regular music player features such as shuffle, repeat, and queue song. Music can also play in the background.
+
+# Library Used
+- **Jetpack Compose** - Modern UI toolkit for native Android UI
+- **Media3 ExoPlayer** - Media player for audio/video playback
+- **Room** - SQLite database abstraction layer
+- **Retrofit** - Type-safe HTTP client
+- **Hilt** - Dependency injection libra
+
+# Application Screenshot
+## Login Screen
+<img src="screenshot/login.png" alt="Login Screen" width="300">
+
+## Home Screen
+<img src="screenshot/home.png" alt="Home Screen" width="300">
+
+## Library Screen
+<img src="screenshot/library.png" alt="Library Screen" width="300">
+
+## Music Player
+<img src="screenshot/music_player.png" alt="Music Player" width="300">
+
+## Profile Screen
+<img src="screenshot/profile.png" alt="Profile Screen" width="300">
+
+## Upload Music
+<img src="screenshot/upload.png" alt="Upload Music" width="300">
+
+## Edit Music
+<img src="screenshot/edit.png" alt="Edit Music" width="300">
+
+## App Context
+<img src="screenshot/context.png" alt="App Context" width="300">
+
+# Work Distribution
+
+## Moh Fairuz Alauddin Yahya (13522057)
+- Library
+- Music Player
+- Network Sensing
+- Shuffle
+- Repeat
+- Owasp
+- Debugging
+
+## Rayhan Fadhlan Azka (13522095)
+- Header and Navbar
+- Login
+- Music Player
+- Home
+- Background Service
+- Add Song
+- Debugging
+## Rayendra Althaf Taraka Noor (13522107)
+- Mini Player
+- Liked Songs
+- Profile
+- Queue
+- Edit Song
+- Logout
+
+# Work hours
+- Moh Fairuz Alauddin Yahya (13522057) : 10 hours
+- Rayhan Fadhlan Azka (13522095) : 10 hours
+- Rayendra Althaf Taraka Noor (13522107) : 10 hours
 # OWASP Security Implementation
 
 ## M4: Insufficient Input/Output Validation
